@@ -46,6 +46,7 @@ async function bootstrap() {
   app.use(cookieParser());
   app.enableCors({
     origin: [
+      'https://scanitectai.com/',
       'http://localhost:3000',
       'http://example.com',
       'http://www.example.com',

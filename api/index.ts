@@ -18,9 +18,9 @@ async function bootstrapServer() {
     .setTitle("Jwt authentication mongoose nestjs example")
     .setDescription("JwtService utilities module based on the nestjs/jwt package")
     .setVersion("1.0")
-    .addServer("http://localhost:3000/", "Local environment")
-    .addServer("https://staging.yourapi.com/", "Staging")
-    .addServer("https://production.yourapi.com/", "Production")
+    .addServer("https://scanitectai.com/", "Local environment")
+    .addServer("https://scanitectai.com/", "Staging")
+    .addServer("https://scanitectai.com/", "Production")
     .addTag("Jwt authentication")
     .addCookieAuth(
       "refresh_token",
@@ -51,6 +51,7 @@ async function bootstrapServer() {
   app.enableCors({
     origin: [
       "http://localhost:3000",
+      "https://scanitectai.com/",
       "http://example.com",
       "http://www.example.com",
       "http://app.example.com",
