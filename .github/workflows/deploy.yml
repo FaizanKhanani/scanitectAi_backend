@@ -1,0 +1,22 @@
+name: Deploy Backend
+on:
+push:
+branches: [ "main", "master" ]
+workflow_dispatch: {}
+concurrency:
+group: deploy-backend
+cancel-in-progress: false
+jobs:
+deploy:
+runs-on: ubuntu-latest
+steps:
+- name: SSH and deploy backend
+uses: appleboy/ssh-action@v1.0.3
+with:
+host: ${{ secrets.VPS_HOST }}
+username: ${{ secrets.VPS_USER }}
+key: ${{ secrets.VPS_KEY }}
+script_stop: true
+command_timeout: 30m
+script: |
+bash /usr/local/bin/deploy-backend.sh
