@@ -130,3 +130,8 @@ dist
 .yarn/install-state.gz
 .pnp.*
 .vercel
+keys/.json
+.env
+.env.
+node_modules/
+dist/
