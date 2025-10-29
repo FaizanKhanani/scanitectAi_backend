@@ -77,70 +77,70 @@ export class VisionController {
     console.log("the userid", userId)
 
     // 1) Get image bytes
-//     let buf: Buffer | undefined;
-//     const up = files?.image?.[0] ?? files?.file?.[0];
-//     if (up?.buffer) {
-//       buf = up.buffer;
-//     } else if (get('image_base64')) {
-//       buf = Buffer.from(get('image_base64') as string, 'base64');
-//     } else if (get('image_url')) {
-//       const url = get('image_url') as string;
-//       const resp = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer', timeout: 15000 });
-//       buf = Buffer.from(resp.data as any);
-//     }
+    let buf: Buffer | undefined;
+    const up = files?.image?.[0] ?? files?.file?.[0];
+    if (up?.buffer) {
+      buf = up.buffer;
+    } else if (get('image_base64')) {
+      buf = Buffer.from(get('image_base64') as string, 'base64');
+    } else if (get('image_url')) {
+      const url = get('image_url') as string;
+      const resp = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer', timeout: 15000 });
+      buf = Buffer.from(resp.data as any);
+    }
 
-//     if (!buf) {
-//       throw new BadRequestException(
-//         "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
-//       );
-//     }
+    if (!buf) {
+      throw new BadRequestException(
+        "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
+      );
+    }
 
-//     // 2) Options
-//     const lat = get('lat') ? parseFloat(get('lat') as string) : undefined;
-//     const lon = get('lon') ? parseFloat(get('lon') as string) : undefined;
-//     const topK = get('top_k') ? parseInt(get('top_k') as string, 10) : 5;
+    // 2) Options
+    const lat = get('lat') ? parseFloat(get('lat') as string) : undefined;
+    const lon = get('lon') ? parseFloat(get('lon') as string) : undefined;
+    const topK = get('top_k') ? parseInt(get('top_k') as string, 10) : 5;
 
-//     // 3) Call service
-//     const results = await this.visionService.recognize(buf, { lat, lon, topK });
-//     if (!results.length) throw new BadRequestException('No landmark recognized');
+    // 3) Call service
+    const results = await this.visionService.recognize(buf, { lat, lon, topK });
+    if (!results.length) throw new BadRequestException('No landmark recognized');
 
-//     console.log("the result is", results)
+    console.log("the result is", results)
 
-//    const placeName = results[0].name;
+   const placeName = results[0].name;
 
-//     const findPlaceDetail = await this.visionService.findPlaceDetail(placeName);
-//  console.log("the details", findPlaceDetail)
-//   if (findPlaceDetail) {
+    const findPlaceDetail = await this.visionService.findPlaceDetail(placeName);
+ console.log("the details", findPlaceDetail)
+  if (findPlaceDetail) {
 
 
-//     await this.userService.addScanIdInUser(userId, findPlaceDetail.id);
-//     return res.status(200).json({
-//       status: 200,
-//       message: 'success',
-//       data: findPlaceDetail,
-//     });
-//   }
+    await this.userService.addScanIdInUser(userId, findPlaceDetail.id);
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: findPlaceDetail,
+    });
+  }
 
-//   const response = await this.visionService.getDetail(placeName);
+  const response = await this.visionService.getDetail(placeName);
 
-//   console.log("the response of wiki data", response)
+  console.log("the response of wiki data", response)
 
-//   if (response.status === 200) {
-//     const saved = await this.visionService.upsertPlaceFromDetail(response.data, placeName);
-//     await this.userService.addScanIdInUser(userId, saved._id);
+  if (response.status === 200) {
+    const saved = await this.visionService.upsertPlaceFromDetail(response.data, placeName);
+    await this.userService.addScanIdInUser(userId, saved.id);
 
-//     return res.status(200).json({
-//       status: 200,
-//       message: 'success',
-//       data: saved, 
-//     });
-//   }
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: saved, 
+    });
+  }
 
-//   return res.status(400).json({
-//     status: 400,
-//     message: 'failed',
-//     data: 'error in getting the detail',
-//   });
+  return res.status(400).json({
+    status: 400,
+    message: 'failed',
+    data: 'error in getting the detail',
+  });
 
 
 
@@ -148,30 +148,30 @@ export class VisionController {
 
 
 
-    return res.status(400).json({
-    "status": 200,
-    "message": "success",
-    "data": {
-        "id": "68fcbf2854a04c18631281ce",
-        "title": "Niagara Falls",
-        "thumbnailImage": "http://localhost:4000/files/68fcbf1d7ede1cbb7993da48",
-        "originalImage": "http://localhost:4000/files/68fcbf077ede1cbb7993da38",
-        "description": "Niagara Falls is a group of three waterfalls at the southern end of Niagara Gorge, spanning the border between the province of Ontario in Canada and the state of New York in the United States. The largest of the three is Horseshoe Falls, which straddles the international border of the two countries. It is also known as the Canadian Falls. The smaller American Falls and Bridal Veil Falls lie within the United States. Bridal Veil Falls is separated from Horseshoe Falls by Goat Island and from American Falls by Luna Island, with both islands situated in New York.\nFormed by the Niagara River, which drains Lake Erie into Lake Ontario, the combined falls have the highest flow rate of any waterfall in North America that has a vertical drop of more than 50 m (164 ft). During peak daytime tourist hours, more than 168,000 m3 (5.9 million cu ft) of water goes over the crest of the falls every minute. Horseshoe Falls is the most powerful waterfall in North America, as measured by flow rate. Niagara Falls is famed for its beauty and is a valuable source of hydroelectric power. Balancing recreational, commercial, and industrial uses has been a challenge for the stewards of the falls since the 19th...",
-        "countries": "Canada",
-        "administrativeAreas": "Ontario",
-        "ranges": [],
-        "instanceOf": [
-            "tourist attraction",
-            "waterfall",
-            "horseshoe waterfall"
-        ],
-        "coordinates": [
-            -79.071,
-            43.08
-        ],
-        "height": 57
-    }
-})
+//     return res.status(200).json({
+//     "status": 200,
+//     "message": "success",
+//     "data": {
+//         "id": "68fcbf2854a04c18631281ce",
+//         // "title": "Niagara Falls",
+//         // "thumbnailImage": "http://localhost:4000/files/68fcbf1d7ede1cbb7993da48",
+//         // "originalImage": "http://localhost:4000/files/68fcbf077ede1cbb7993da38",
+//         // "description": "Niagara Falls is a group of three waterfalls at the southern end of Niagara Gorge, spanning the border between the province of Ontario in Canada and the state of New York in the United States. The largest of the three is Horseshoe Falls, which straddles the international border of the two countries. It is also known as the Canadian Falls. The smaller American Falls and Bridal Veil Falls lie within the United States. Bridal Veil Falls is separated from Horseshoe Falls by Goat Island and from American Falls by Luna Island, with both islands situated in New York.\nFormed by the Niagara River, which drains Lake Erie into Lake Ontario, the combined falls have the highest flow rate of any waterfall in North America that has a vertical drop of more than 50 m (164 ft). During peak daytime tourist hours, more than 168,000 m3 (5.9 million cu ft) of water goes over the crest of the falls every minute. Horseshoe Falls is the most powerful waterfall in North America, as measured by flow rate. Niagara Falls is famed for its beauty and is a valuable source of hydroelectric power. Balancing recreational, commercial, and industrial uses has been a challenge for the stewards of the falls since the 19th...",
+//         // "countries": "Canada",
+//         // "administrativeAreas": "Ontario",
+//         // "ranges": [],
+//         // "instanceOf": [
+//         //     "tourist attraction",
+//         //     "waterfall",
+//         //     "horseshoe waterfall"
+//         // ],
+//         // "coordinates": [
+//         //     -79.071,
+//         //     43.08
+//         // ],
+//         // "height": 57
+//     }
+// })
   }
 
 

@@ -136,7 +136,7 @@ console.log("the user ",filteredUser);
     }
 
 
-    const resetPasswordOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetPasswordOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
       const resetPasswordExpiry = new Date(Date.now() + 5 * 60 * 1000);
    
