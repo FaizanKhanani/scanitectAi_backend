@@ -122,7 +122,7 @@ console.log("the user ",filteredUser);
   }
 
 
-  async forgotPassword(userEmail: string){
+  async forgotPasswordEmail(userEmail: string){
     const email = userEmail
     console.log("in auth service", userEmail )
 
@@ -155,9 +155,9 @@ console.log("the user ",filteredUser);
 
 
 
-  async changePassword(email: string, oldPassword: string, updatedPassword: string){
+   async forogtPassword(email: string, updatedPassword: string){
 
-    console.log("the user email in forgot password service", email, "old password",oldPassword,"update",updatedPassword )
+    console.log("the user email in forgot password service", email, "update",updatedPassword )
    
     const user = await this.userModel.findOne({ email });
     console.log("the user is", user)
@@ -173,14 +173,14 @@ console.log("the user ",filteredUser);
     }
 
 
-     const match = await bcrypt.compare(oldPassword, user?.password);
+    //  const match = await bcrypt.compare(oldPassword, user?.password);
 
 
-    if(!match){
-       return {success: false, message: 'the enter password is not correct'};
-    }
+    // if(!match){
+    //    return {success: false, message: 'the enter password is not correct'};
+    // }
 
-    if (match) {
+  
 
      const saltOrRounds = 10;
      const hashedPassword = await bcrypt.hash(
@@ -205,21 +205,82 @@ console.log("the user ",filteredUser);
    
 
 
-    // createUserDto.password = hashedPassword;
 
-      // const payload = { email: user.email, userId: user._id.toString(), username: user.username, role: user.role };
-      // const tokens = await this.getTokens(payload);
-
-      // return {
-      //   user,
-      //   token:{...tokens}
-        
-      // };
-    }
 
 
 
 
 
   }
+
+
+
+
+  // async changePassword(email: string, oldPassword: string, updatedPassword: string){
+
+  //   console.log("the user email in forgot password service", email, "old password",oldPassword,"update",updatedPassword )
+   
+  //   const user = await this.userModel.findOne({ email });
+  //   console.log("the user is", user)
+
+  //   if(!user){
+  //      return {success: false, message: 'the user is not found of this email'};
+  //   }
+
+  //   if(user.resetPasswordCodeStatus === false){
+
+  //     return {success: false, message: 'the reset password request is not come'};
+ 
+  //   }
+
+
+  //    const match = await bcrypt.compare(oldPassword, user?.password);
+
+
+  //   if(!match){
+  //      return {success: false, message: 'the enter password is not correct'};
+  //   }
+
+  //   if (match) {
+
+  //    const saltOrRounds = 10;
+  //    const hashedPassword = await bcrypt.hash(
+  //     updatedPassword,
+  //     saltOrRounds
+  //   );
+
+  //   console.log("the hashed",hashedPassword )
+
+  //       await this.userModel.updateOne(
+  //   { email: email },
+  //   { password: hashedPassword , resetPasswordCodeStatus: false }
+  // );
+
+
+
+  // return{
+  //       success: true,  message: 'Password is successfully update' 
+  //     }
+
+
+   
+
+
+  //   // createUserDto.password = hashedPassword;
+
+  //     // const payload = { email: user.email, userId: user._id.toString(), username: user.username, role: user.role };
+  //     // const tokens = await this.getTokens(payload);
+
+  //     // return {
+  //     //   user,
+  //     //   token:{...tokens}
+        
+  //     // };
+  //   }
+
+
+
+
+
+  // }
 }

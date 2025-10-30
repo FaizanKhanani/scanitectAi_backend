@@ -12,6 +12,7 @@ import { LoggerService } from "../common/service/logger.service";
 import { SignInDto } from "./dto/signIn.dto";
 import { ForgotPasswordDto } from "./dto/forgotPasswordCodeSend.dto";
 import { ForgotChangePassword } from "./dto/forgotChangePassword.dto";
+import { ForgotPassword } from "./dto/forgotPassword.dto";
 import { Response } from "express";
 import { AuthService } from "./auth.service";
 import { UserService } from "../users/users.service";
@@ -216,7 +217,7 @@ return sendResponse(
     // @UseGuards(AuthGuard)
     @Public()
     @UseFilters(new HttpExceptionFilter())
-    @Post('forgot-password')
+    @Post('forgot-password-email')
     async forgotPasswordCodeSend(
       @Body() forgotPasswordCodeSend: ForgotPasswordDto,
       @Res() res: Response,
@@ -225,7 +226,7 @@ return sendResponse(
       
       console.log("the user email in forgot password controller", userEmail)
 
-      const response = await this.authService.forgotPassword(userEmail)
+      const response = await this.authService.forgotPasswordEmail(userEmail)
 
 
        console.log("the user in auth controller", response)
@@ -276,19 +277,20 @@ return sendResponse(
     })
 
 
-    // @UseGuards(AuthGuard)
-    @Public()
+
+
+       @Public()
     @UseFilters(new HttpExceptionFilter())
-    @Post('forgot-change-password')
-    async forgotChangePassword(
-      @Body() forgotChangePasswordDto: ForgotChangePassword,
+    @Post('forgot-password')
+    async forgotPassword(
+      @Body() forgotPasswordDto: ForgotPassword,
       @Res() res: Response,
     ): Promise<any> {
-      const { email, oldPassword, updatedPassword  } = forgotChangePasswordDto;
+      const { email, updatedPassword  } = forgotPasswordDto;
       
-      console.log("the user email in forgot password controller", email, "old password",oldPassword,"update",updatedPassword )
+      console.log("the user email in forgot password controller", email, "update",updatedPassword )
 
-        const changePassword = await this.authService.changePassword(email, oldPassword, updatedPassword)
+        const changePassword = await this.authService.forogtPassword(email, updatedPassword)
         
         if(changePassword.success === false){
              return sendResponse(
@@ -346,6 +348,79 @@ return sendResponse(
     //     {  message: "the reset password code is send on you email" }
     //   );
     }
+
+
+
+    // @UseGuards(AuthGuard)
+    // @Public()
+    // @UseFilters(new HttpExceptionFilter())
+    // @Post('change-password')
+    // async forgotChangePassword(
+    //   @Body() forgotChangePasswordDto: ForgotChangePassword,
+    //   @Res() res: Response,
+    // ): Promise<any> {
+    //   const { email, oldPassword, updatedPassword  } = forgotChangePasswordDto;
+      
+    //   console.log("the user email in forgot password controller", email, "old password",oldPassword,"update",updatedPassword )
+
+    //     const changePassword = await this.authService.changePassword(email, oldPassword, updatedPassword)
+        
+    //     if(changePassword.success === false){
+    //          return sendResponse(
+    //     res,
+    //     HttpStatus.UNAUTHORIZED,
+    //     statusMessage[HttpStatus.UNAUTHORIZED],
+    //     false,
+    //     changePassword.message
+    //   );
+
+    //     }
+
+    //     return sendResponse(
+    //     res,
+    //     HttpStatus.OK,
+    //     statusMessage[HttpStatus.OK],
+    //     true,
+    //     changePassword.message
+    //   );
+
+
+
+    //   // const response = await this.authService.resetPassword(userEmail)
+
+
+    // //    console.log("the user in auth controller", response)
+
+    // //    if(response.success === false){
+    // //       return sendResponse(
+    // //   res,
+    // //   HttpStatus.UNAUTHORIZED,
+    // //   statusMessage[HttpStatus.UNAUTHORIZED],
+    // //   false,
+    // //   {
+    // //     message : 'the user is not found of this email'
+    // //   }
+    // // );
+
+    // //    }
+
+
+
+    // //     const isMAil = process.env.IS_EMAIL
+    // // console.log('##############', isMAil)
+    // // if (isMAil === "True") {
+    // //   console.log("the email", userEmail,"otp",response.data.resetPasswordOtp)
+    // //   await this.mailer.sendEmailVerification(userEmail, response.data.resetPasswordOtp)
+    // // }
+     
+    // //   return sendResponse(
+    // //     res,
+    // //     HttpStatus.OK,
+    // //     statusMessage[HttpStatus.OK],
+    // //     true,
+    // //     {  message: "the reset password code is send on you email" }
+    // //   );
+    // }
 
 
 

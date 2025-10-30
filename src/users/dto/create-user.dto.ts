@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {  ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsNotEmpty,
 
@@ -46,5 +46,7 @@ export class CreateUserDto {
   resendCode?: Boolean;
    @ApiProperty({ description: 'reset password code status' })
   resetPasswordCodeStatus?: Boolean;
+ 
+
   
 }

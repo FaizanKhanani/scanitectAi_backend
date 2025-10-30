@@ -69,6 +69,15 @@ scanAreas?: string[];
 
   @Prop({ type: String, default: null })
   address?: string;
+
+  @Prop({ type: String, default: 'free' })
+  plan: string;
+
+    @Prop({ type: String, default: '0' })
+  remainCredits: string;
+
+    @Prop({ type: String, default: '10' })
+  totalCredit: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
