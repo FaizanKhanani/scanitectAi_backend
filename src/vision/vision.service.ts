@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 import { ImageAnnotatorClient, protos } from '@google-cloud/vision';
 import { FilesService } from '../files/files.service';
 import { Place, PlaceDocument } from './schemas/imageData.model'
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 
 type LandmarkOut = {
   name: string;
@@ -313,239 +313,228 @@ return [bestOut];
 
 
 
-// private async fetchWikiSummary(title: string, lang = 'en') {
-//     const res = await axios.get(
-//       `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
-//       { params: { redirect: true } }
-//     );
-//     return res.data;
-//   }
+ private readonly WIKI_UA = 'ScanitectAI/1.0 (+https://scanitectai.com/api; mailto:dev@scanitectai.com)';
+  private readonly WIKI_HEADERS = {
+    'User-Agent': this.WIKI_UA,
+    'Accept': 'application/json'
+  };
+  private readonly MAX_CONCURRENCY = 5;
 
-  // private async searchBestTitles(query: string, lang = 'en', limit = 5): Promise<string[]> {
-  //   const res = await axios.get(`https://${lang}.wikipedia.org/w/api.php`, {
-  //     params: {
-  //       action: 'query',
-  //       list: 'search',
-  //       srwhat: 'nearmatch',
-  //       srlimit: limit,
-  //       srsearch: query,
-  //       utf8: 1,
-  //       format: 'json',
-  //       origin: '*'
-  //     }
-  //   });
-  //   const hits = res.data?.query?.search || [];
-  //   return hits.map((h: any) => h.title);
-  // }
-
-  // private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: string; summary: any } | null> {
-  //   try {
-  //     const first = await this.fetchWikiSummary(name, lang);
-  //     if (first && first.type !== 'disambiguation') {
-  //       return { title: first.title, summary: first };
-  //     }
-  //   } catch (e: any) {
-  //     if (e?.response?.status !== 404) throw e;
-  //   }
-
-  //   const titles = await this.searchBestTitles(name, lang, 5);
-  //   for (const t of titles) {
-  //     try {
-  //       const s = await this.fetchWikiSummary(t, lang);
-  //       if (s && s.type !== 'disambiguation') return { title: s.title, summary: s };
-  //     } catch { /* ignore and try next */ }
-  //   }
-
-  //   // As a last resort, return the disambiguation (if we had one)
-  //   try {
-  //     const first = await this.fetchWikiSummary(name, lang);
-  //     if (first) return { title: first.title, summary: first };
-  //   } catch {}
-  //   return null;
-  // }
-
-
-
-  // Prefer physical places/landmarks, so "(statue)" beats the disambiguation page
-private readonly PREFERRED_TERMS = [
-  'statue','monument','landmark','building','tower','bridge','park','temple','cathedral',
-  'church','mosque','museum','palace','castle','fort','arch','dam','pagoda','stupa',
-  'shrine','island','mountain','volcano','waterfall','river','bay','lake'
-];
-
-// You already have this; leaving as-is
-private async fetchWikiSummary(title: string, lang = 'en') {
-  const res = await axios.get(
-    `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
-    { params: { redirect: true } }
-  );
-  return res.data;
-}
-
-// Keep this if you want; used as one of the search sources
-private async searchBestTitles(query: string, lang = 'en', limit = 5): Promise<string[]> {
-  const res = await axios.get(`https://${lang}.wikipedia.org/w/api.php`, {
-    params: {
-      action: 'query',
-      list: 'search',
-      srwhat: 'nearmatch',
-      srlimit: limit,
-      srsearch: query,
-      utf8: 1,
-      format: 'json',
-      origin: '*'
-    }
+  // Shared axios instance for all Wikipedia/Wikidata calls
+  private readonly wiki: AxiosInstance = axios.create({
+    headers: this.WIKI_HEADERS,
+    timeout: 12000
   });
-  const hits = res.data?.query?.search || [];
-  return hits.map((h: any) => h.title);
-}
 
-// Better search focusing on titles with parentheses qualifiers like "(statue)"
-private async searchByTitle(query: string, lang = 'en', limit = 10): Promise<string[]> {
-  const res = await axios.get(`https://${lang}.wikipedia.org/w/api.php`, {
-    params: {
-      action: 'query',
-      list: 'search',
-      srsearch: `intitle:"${query}"`,
-      srlimit: limit,
-      srnamespace: 0,
-      format: 'json',
-      origin: '*'
+  private sleep(ms: number) {
+    return new Promise<void>(r => setTimeout(r, ms));
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    fn: (item: T, idx: number) => Promise<R>
+  ): Promise<R[]> {
+    const out: R[] = [];
+    for (let i = 0; i < items.length; i += limit) {
+      const slice = items.slice(i, i + limit);
+      const part = await Promise.all(slice.map((it, j) => fn(it, i + j)));
+      out.push(...part);
+      // light pause to be nice to the API
+      await this.sleep(100);
     }
-  });
-  const hits = res.data?.query?.search || [];
-  return hits.map((h: any) => h.title);
-}
+    return out;
+  }
 
-// If we land on a disambiguation page, scan its links
-private async fetchDisambigLinks(title: string, lang = 'en', limit = 200): Promise<string[]> {
-  const out: string[] = [];
-  let plcontinue: string | undefined = undefined;
+  private readonly PREFERRED_TERMS = [
+    'statue','monument','landmark','building','tower','bridge','park','temple','cathedral',
+    'church','mosque','museum','palace','castle','fort','arch','dam','pagoda','stupa',
+    'shrine','island','mountain','volcano','waterfall','river','bay','lake'
+  ];
 
-  do {
-    const res = await axios.get(`https://${lang}.wikipedia.org/w/api.php`, {
+  // Fetch REST summary with UA
+  private async fetchWikiSummary(title: string, lang = 'en') {
+    const res = await this.wiki.get(
+      `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
+      { params: { redirect: true } }
+    );
+    return res.data;
+  }
+
+  // Keep this; used as one of the search sources
+  private async searchBestTitles(query: string, lang = 'en', limit = 5): Promise<string[]> {
+    const res = await this.wiki.get(`https://${lang}.wikipedia.org/w/api.php`, {
       params: {
         action: 'query',
-        prop: 'links',
-        plnamespace: 0,
-        pllimit: Math.min(500, limit),
-        titles: title,
+        list: 'search',
+        srwhat: 'nearmatch',
+        srlimit: limit,
+        srsearch: query,
+        utf8: 1,
         format: 'json',
-        origin: '*',
-        ...(plcontinue ? { plcontinue } : {})
+        origin: '*'
       }
     });
-    const pages = res.data?.query?.pages || {};
-    const firstKey = Object.keys(pages)[0];
-    const links = firstKey ? (pages[firstKey]?.links || []) : [];
-    out.push(...links.map((l: any) => l.title));
-    plcontinue = res.data?.continue?.plcontinue;
-  } while (plcontinue && out.length < limit);
+    const hits = res.data?.query?.search || [];
+    return hits.map((h: any) => h.title);
+  }
 
-  // de-dup and cap
-  return Array.from(new Set(out)).slice(0, limit);
-}
+  // Better search focusing on titles with parentheses qualifiers like "(statue)"
+  private async searchByTitle(query: string, lang = 'en', limit = 10): Promise<string[]> {
+    const res = await this.wiki.get(`https://${lang}.wikipedia.org/w/api.php`, {
+      params: {
+        action: 'query',
+        list: 'search',
+        srsearch: `intitle:"${query}"`,
+        srlimit: limit,
+        srnamespace: 0,
+        format: 'json',
+        origin: '*'
+      }
+    });
+    const hits = res.data?.query?.search || [];
+    return hits.map((h: any) => h.title);
+  }
 
-private parenTerm(title: string): string | null {
-  const m = title.match(/\(([^)]+)\)\s*$/);
-  return m ? m[1].toLowerCase() : null;
-}
+  // If we land on a disambiguation page, scan its links
+  private async fetchDisambigLinks(title: string, lang = 'en', limit = 200): Promise<string[]> {
+    const out: string[] = [];
+    let plcontinue: string | undefined = undefined;
 
-private containsPreferred(text?: string, terms = this.PREFERRED_TERMS) {
-  if (!text) return false;
-  const lc = text.toLowerCase();
-  return terms.some(t => lc.includes(t));
-}
+    do {
+      const res = await this.wiki.get(`https://${lang}.wikipedia.org/w/api.php`, {
+        params: {
+          action: 'query',
+          prop: 'links',
+          plnamespace: 0,
+          pllimit: Math.min(500, limit),
+          titles: title,
+          format: 'json',
+          origin: '*',
+          ...(plcontinue ? { plcontinue } : {})
+        }
+      });
+      const pages = res.data?.query?.pages || {};
+      const firstKey = Object.keys(pages)[0];
+      const links = firstKey ? (pages[firstKey]?.links || []) : [];
+      out.push(...links.map((l: any) => l.title));
+      plcontinue = res.data?.continue?.plcontinue;
+    } while (plcontinue && out.length < limit);
 
-private pickBestCandidate(name: string, summaries: any[], terms = this.PREFERRED_TERMS): any | null {
-  if (!summaries.length) return null;
-  const base = name.toLowerCase();
+    // de-dup and cap
+    return Array.from(new Set(out)).slice(0, limit);
+  }
 
-  const scored = summaries
-    .filter(s => s && s.type !== 'disambiguation')
-    .map(s => {
-      let score = 0;
-      const title = s.title || '';
-      const lcTitle = title.toLowerCase();
-      const p = this.parenTerm(title);
+  private parenTerm(title: string): string | null {
+    const m = title.match(/\(([^)]+)\)\s*$/);
+    return m ? m[1].toLowerCase() : null;
+  }
 
-      if (lcTitle.startsWith(base + ' (')) score += 5;     // Name (…)
-      if (p && terms.includes(p)) score += 10;             // "(statue)" etc.
-      if (this.containsPreferred(s.description, terms)) score += 4; // description hints
-      if (s.originalimage?.source) score += 1;             // richer page often = the one
-      return { s, score };
-    })
-    .sort((a, b) => b.score - a.score);
+  private containsPreferred(text?: string, terms = this.PREFERRED_TERMS) {
+    if (!text) return false;
+    const lc = text.toLowerCase();
+    return terms.some(t => lc.includes(t));
+  }
 
-  return scored[0]?.s || null;
-}
+  private pickBestCandidate(name: string, summaries: any[], terms = this.PREFERRED_TERMS): any | null {
+    if (!summaries.length) return null;
+    const base = name.toLowerCase();
 
-// UPDATED: smarter resolver that avoids disambiguation pages
-private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: string; summary: any } | null> {
-  // 1) Try exact (with redirect)
-  let first: any = null;
-  try {
-    first = await this.fetchWikiSummary(name, lang);
-    if (first && first.type !== 'disambiguation') {
-      return { title: first.title, summary: first };
+    const scored = summaries
+      .filter(s => s && s.type !== 'disambiguation')
+      .map(s => {
+        let score = 0;
+        const title = s.title || '';
+        const lcTitle = title.toLowerCase();
+        const p = this.parenTerm(title);
+
+        if (lcTitle.startsWith(base + ' (')) score += 5;     // Name (…)
+        if (p && terms.includes(p)) score += 10;             // "(statue)" etc.
+        if (this.containsPreferred(s.description, terms)) score += 4; // description hints
+        if (s.originalimage?.source) score += 1;             // richer page often = the one
+        return { s, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    return scored[0]?.s || null;
+  }
+
+  // Smarter resolver that avoids disambiguation pages, with throttling + softer 403/429 handling
+  private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: string; summary: any } | null> {
+    // 1) Try exact (with redirect)
+    let first: any = null;
+    try {
+      first = await this.fetchWikiSummary(name, lang);
+      if (first && first.type !== 'disambiguation') {
+        return { title: first.title, summary: first };
+      }
+    } catch (e: any) {
+      const code = e?.response?.status;
+      if (code === 404 || code === 403 || code === 429) {
+        // continue to search; 403/429 often due to rate/UA—search might still work
+        // if UA is set (we set it above).
+      } else {
+        throw e;
+      }
     }
-  } catch (e: any) {
-    if (e?.response?.status !== 404) throw e;
-  }
 
-  // 2) Gather candidates from two searches
-  const titleSet = new Set<string>();
-  try {
-    const t1 = await this.searchByTitle(name, lang, 10);
-    t1.forEach(t => titleSet.add(t));
-  } catch {}
-  try {
-    const t2 = await this.searchBestTitles(name, lang, 10);
-    t2.forEach(t => titleSet.add(t));
-  } catch {}
+    // 2) Gather candidates from two searches
+    const titleSet = new Set<string>();
+    try {
+      const t1 = await this.searchByTitle(name, lang, 10);
+      t1.forEach(t => titleSet.add(t));
+    } catch {}
+    try {
+      const t2 = await this.searchBestTitles(name, lang, 10);
+      t2.forEach(t => titleSet.add(t));
+    } catch {}
 
-  // Prioritize "Name (" candidates first
-  const allCandidates = Array.from(titleSet);
-  const prioritized = [
-    ...allCandidates.filter(t => t.toLowerCase().startsWith(name.toLowerCase() + ' (')),
-    ...allCandidates
-  ].slice(0, 20);
+    // Prioritize "Name (" candidates first
+    const allCandidates = Array.from(titleSet);
+    const prioritized = [
+      ...allCandidates.filter(t => t.toLowerCase().startsWith(name.toLowerCase() + ' (')),
+      ...allCandidates
+    ].slice(0, 20);
 
-  const summaries = await Promise.all(
-    prioritized.map(t => this.fetchWikiSummary(t, lang).catch(() => null))
-  );
-  const pick = this.pickBestCandidate(name, summaries.filter(Boolean));
-  if (pick) return { title: pick.title, summary: pick };
-
-  // 3) If the first hit was a disambiguation page, mine its links
-  if (first && first.type === 'disambiguation') {
-    const links = await this.fetchDisambigLinks(first.title, lang, 200);
-    const prioritizedLinks = [
-      ...links.filter(t => t.toLowerCase().startsWith(name.toLowerCase() + ' (')),
-      ...links
-    ].slice(0, 30);
-
-    const linkSummaries = await Promise.all(
-      prioritizedLinks.map(t => this.fetchWikiSummary(t, lang).catch(() => null))
+    // Throttled summaries
+    const summariesRaw = await this.mapWithConcurrency(
+      prioritized,
+      this.MAX_CONCURRENCY,
+      t => this.fetchWikiSummary(t, lang).catch(() => null)
     );
-    const pick2 = this.pickBestCandidate(name, linkSummaries.filter(Boolean));
-    if (pick2) return { title: pick2.title, summary: pick2 };
+    const summaries = summariesRaw.filter(Boolean) as any[];
+
+    const pick = this.pickBestCandidate(name, summaries);
+    if (pick) return { title: pick.title, summary: pick };
+
+    // 3) If the first hit was a disambiguation page, mine its links
+    if (first && first.type === 'disambiguation') {
+      const links = await this.fetchDisambigLinks(first.title, lang, 200);
+      const prioritizedLinks = [
+        ...links.filter(t => t.toLowerCase().startsWith(name.toLowerCase() + ' (')),
+        ...links
+      ].slice(0, 30);
+
+      const linkSummariesRaw = await this.mapWithConcurrency(
+        prioritizedLinks,
+        this.MAX_CONCURRENCY,
+        t => this.fetchWikiSummary(t, lang).catch(() => null)
+      );
+      const linkSummaries = linkSummariesRaw.filter(Boolean) as any[];
+
+      const pick2 = this.pickBestCandidate(name, linkSummaries);
+      if (pick2) return { title: pick2.title, summary: pick2 };
+    }
+
+    // 4) Fall back to disambiguation (last resort)
+    if (first) return { title: first.title, summary: first };
+    return null;
   }
-
-  // 4) Fall back to disambiguation (last resort)
-  if (first) return { title: first.title, summary: first };
-  return null;
-}
-
-
-
-
 
   private async fetchWikidataViaAPI(qid: string) {
     try {
-      const entityRes = await axios.get(
-        `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
-        { headers: { 'User-Agent': 'YourAppName/1.0 (contact@example.com)' } }
+      const entityRes = await this.wiki.get(
+        `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`
       );
       const entity = entityRes.data?.entities?.[qid];
       const claims = entity?.claims || {};
@@ -597,7 +586,7 @@ private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: stri
         ...countryIds, ...adminIds, ...rangeIds, ...architectIds, ...instanceIds
       ]));
       if (ids.length) {
-        const labelsRes = await axios.get('https://www.wikidata.org/w/api.php', {
+        const labelsRes = await this.wiki.get('https://www.wikidata.org/w/api.php', {
           params: {
             action: 'wbgetentities',
             ids: ids.join('|'),
@@ -605,12 +594,11 @@ private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: stri
             languages: 'en',
             format: 'json',
             origin: '*'
-          },
-          headers: { 'User-Agent': 'YourAppName/1.0 (contact@example.com)' }
+          }
         });
         const ents = labelsRes.data?.entities || {};
         for (const [id, obj] of Object.entries<any>(ents)) {
-          const label = obj?.labels?.en?.value;
+          const label = (obj as any)?.labels?.en?.value;
           if (label) labels[id] = label;
         }
       }
@@ -642,6 +630,8 @@ private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: stri
   ) {
     const { longDescriptionChars = 1500, lang = 'en' } = opts;
 
+    console.log("here come");
+
     const parseWikidataPoint = (wkt?: string) => {
       if (!wkt) return null;
       const m = wkt.match(/Point\(([-\d.]+)\s+([-\d.]+)\)/);
@@ -662,10 +652,10 @@ private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: stri
       const resolvedTitle = resolved.title;
       const wikiData = resolved.summary;
 
-      // Longer description
+      // Longer description (with UA)
       let longDescription = '';
       try {
-        const extractRes = await axios.get(`https://${lang}.wikipedia.org/w/api.php`, {
+        const extractRes = await this.wiki.get(`https://${lang}.wikipedia.org/w/api.php`, {
           params: {
             action: 'query',
             prop: 'extracts',
@@ -735,7 +725,7 @@ private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: stri
           const sparqlResponse = await axios.get('https://query.wikidata.org/sparql', {
             headers: {
               Accept: 'application/sparql-results+json',
-              'User-Agent': 'YourAppName/1.0 (contact@example.com)'
+              'User-Agent': this.WIKI_UA
             },
             params: { query: sparqlQuery },
             timeout: 12000
@@ -789,7 +779,10 @@ private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: stri
           console.warn('Wikidata SPARQL failed:', sparqlErr?.message || sparqlErr);
         }
 
-        if (!sparqlWorked || (!wd.countries.length && !wd.administrative_areas.length && !wd.height_m && !wd.elevation_m)) {
+        if (
+          !sparqlWorked ||
+          (!wd.countries.length && !wd.administrative_areas.length && !wd.height_m && !wd.elevation_m)
+        ) {
           const apiFallback = await this.fetchWikidataViaAPI(qid);
           if (apiFallback) {
             wd = {
@@ -833,7 +826,6 @@ private async resolveWikipedia(name: string, lang = 'en'): Promise<{ title: stri
       return { status: err?.response?.status || 500, statusMessage: 'error', data: 'Error fetching data' };
     }
   }
-
 
 
 
