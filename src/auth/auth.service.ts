@@ -32,7 +32,7 @@ export class AuthService {
   const { 
   password, 
   createdAt, 
-  updatedAt, 
+  updatedAt,  
   isEmailVerify, 
   resendCode, 
   resetPasswordCodeStatus, 
@@ -216,71 +216,71 @@ console.log("the user ",filteredUser);
 
 
 
-  // async changePassword(email: string, oldPassword: string, updatedPassword: string){
+  async changePassword(email: string, oldPassword: string, updatedPassword: string){
 
-  //   console.log("the user email in forgot password service", email, "old password",oldPassword,"update",updatedPassword )
+    console.log("the user email in forgot password service", email, "old password",oldPassword,"update",updatedPassword )
    
-  //   const user = await this.userModel.findOne({ email });
-  //   console.log("the user is", user)
+    const user = await this.userModel.findOne({ email });
+    console.log("the user is", user)
 
-  //   if(!user){
-  //      return {success: false, message: 'the user is not found of this email'};
-  //   }
+    if(!user){
+       return {success: false, message: 'the user is not found of this email'};
+    }
 
-  //   if(user.resetPasswordCodeStatus === false){
+    // if(user.resetPasswordCodeStatus === false){
 
-  //     return {success: false, message: 'the reset password request is not come'};
+    //   return {success: false, message: 'the reset password request is not come'};
  
-  //   }
+    // }
 
 
-  //    const match = await bcrypt.compare(oldPassword, user?.password);
+     const match = await bcrypt.compare(oldPassword, user?.password);
 
 
-  //   if(!match){
-  //      return {success: false, message: 'the enter password is not correct'};
-  //   }
+    if(!match){
+       return {success: false, message: 'the enter password is not correct'};
+    }
 
-  //   if (match) {
+    if (match) {
 
-  //    const saltOrRounds = 10;
-  //    const hashedPassword = await bcrypt.hash(
-  //     updatedPassword,
-  //     saltOrRounds
-  //   );
+     const saltOrRounds = 10;
+     const hashedPassword = await bcrypt.hash(
+      updatedPassword,
+      saltOrRounds
+    );
 
-  //   console.log("the hashed",hashedPassword )
+    console.log("the hashed",hashedPassword )
 
-  //       await this.userModel.updateOne(
-  //   { email: email },
-  //   { password: hashedPassword , resetPasswordCodeStatus: false }
-  // );
+        await this.userModel.updateOne(
+    { email: email },
+    { password: hashedPassword , resetPasswordCodeStatus: false }
+  );
 
 
 
-  // return{
-  //       success: true,  message: 'Password is successfully update' 
-  //     }
+  return{
+        success: true,  message: 'Password is successfully update' 
+      }
 
 
    
 
 
-  //   // createUserDto.password = hashedPassword;
+    // createUserDto.password = hashedPassword;
 
-  //     // const payload = { email: user.email, userId: user._id.toString(), username: user.username, role: user.role };
-  //     // const tokens = await this.getTokens(payload);
+      // const payload = { email: user.email, userId: user._id.toString(), username: user.username, role: user.role };
+      // const tokens = await this.getTokens(payload);
 
-  //     // return {
-  //     //   user,
-  //     //   token:{...tokens}
+      // return {
+      //   user,
+      //   token:{...tokens}
         
-  //     // };
-  //   }
+      // };
+    }
 
 
 
 
 
-  // }
+  }
 }

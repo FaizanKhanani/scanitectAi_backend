@@ -12,6 +12,7 @@ import { SubscribeModule } from './subscribeWeb/subscription.module';
 import { VisionModule } from './vision/vision.module';
 import { AdminModule } from './admin/admin.module';
 import { FilesModule } from './files/files.module';
+import { TranslateModule } from './translation/translate.module'
 
 console.log(`${process.cwd()}/.env.${process.env.NODE_ENV}`)
 
@@ -44,6 +45,7 @@ console.log(`${process.cwd()}/.env.${process.env.NODE_ENV}`)
     AdminModule,
     VisionModule,
     FilesModule,
+    TranslateModule,
 
   ],
   providers: [

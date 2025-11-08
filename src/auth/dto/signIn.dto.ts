@@ -7,6 +7,8 @@ import {
 } from "class-validator";
 
 export class SignInDto {
+   @ApiProperty({ example: 'Patil@test.com', description: 'email of the user' })
+  email: string;
   @ApiProperty({ example: 'Pradipatil1@', description: 'Password length min 8,1 lowerscase and uppercase letter, 1 number ,1symbol' })
   @IsStrongPassword({
     minLength: 8,
@@ -16,6 +18,5 @@ export class SignInDto {
     minUppercase: 1,
   })
   password: string;
-  @ApiProperty({ example: 'Patil@test.com', description: 'email of the user' })
-  email: string;
+ 
 }

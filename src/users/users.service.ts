@@ -1,10 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, BadRequestException, UnauthorizedException } from "@nestjs/common";
 import { LoggerService } from '../common/service/logger.service';
 import { InjectModel } from "@nestjs/mongoose";
 import { Model, Types } from "mongoose";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { EditUserProfile } from "./dto/edit-user-profile.dto"
-import { User } from "./schemas/user.schema";
+import { User, UserDocument  } from "./schemas/user.schema";
+import { JwtService } from '@nestjs/jwt';
+import { OAuth2Client } from 'google-auth-library';
 import { RefresToken } from "./schemas/refreshtoken.schema";
 import * as bcrypt from "bcrypt";
 import { userData } from "src/interface/common";
@@ -19,8 +21,10 @@ import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class UserService {
+  private googleClient = new OAuth2Client()
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private jwtService: JwtService,
     @InjectModel(RefresToken.name)
     private readonly RefresTokenModel: Model<RefresToken>,
     private readonly logger: LoggerService,
@@ -57,6 +61,140 @@ export class UserService {
   
     return createdUser;
   }
+
+
+
+
+
+
+  private getGoogleAudiences() {
+// Accept tokens from any of your app's registered clients
+return [
+process.env.GOOGLE_WEB_CLIENT_ID,
+process.env.GOOGLE_ANDROID_CLIENT_ID,
+// process.env.GOOGLE_IOS_CLIENT_ID,
+].filter(Boolean) as string[];
+}
+
+
+
+private async verifyGoogleIdToken(idToken: string) {
+
+
+
+const ticket = await this.googleClient.verifyIdToken({
+idToken,
+audience: this.getGoogleAudiences(),
+});
+
+
+
+const payload = ticket.getPayload();
+if (!payload) throw new UnauthorizedException('Invalid Google token');
+const issOk =
+  payload.iss === 'accounts.google.com' ||
+  payload.iss === 'https://accounts.google.com';
+if (!issOk) throw new UnauthorizedException('Invalid Google token issuer');
+
+return payload; // contains sub, email, name, picture, email_verified, etc.
+}
+
+
+
+
+
+
+private async issueTokens(user: UserDocument) {
+const payload = { sub: user._id.toString(), role: user.role };
+const accessToken = await this.jwtService.signAsync(payload, {
+secret: process.env.JWT_SECRET,
+expiresIn: '30d',
+});
+const refreshToken = await this.jwtService.signAsync(payload, {
+secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+expiresIn: '30d',
+});
+return { accessToken, refreshToken };
+}
+
+
+
+
+private usernameFromNameOrEmail(name?: string, email?: string) {
+const base =
+(name || (email ? email.split('@')[0] : 'user'))
+.toLowerCase()
+.replace(/\W+/g, '') || 'user';
+return base; // you can add a uniqueness loop if needed
+}
+
+
+
+
+
+async loginWithGoogle(idToken: string) {
+const payload = await this.verifyGoogleIdToken(idToken);
+const { sub: googleId, email, name, picture, email_verified } = payload;
+
+if (!googleId) throw new UnauthorizedException('No Google sub in token');
+if (!email) throw new BadRequestException('No email in Google token');
+
+// Find by googleId or by email (to link local account)
+let user = await this.userModel.findOne({
+  $or: [{ googleId }, { email }],
+});
+
+if (!user) {
+  // Create new user as Google user
+  user = await this.userModel.create({
+    username: this.usernameFromNameOrEmail(name, email),
+    email,
+    googleId,
+    authProviders: ['google'],
+    isEmailVerify: !!email_verified, // trust if true
+    image: picture || null,
+    role: 'user',
+    password: null, // no password for Google-only account
+  });
+} else {
+  const updates: any = {};
+  if (!user.googleId) updates.googleId = googleId;
+  if (email_verified && !user.isEmailVerify) updates.isEmailVerify = true;
+  if (picture && !user.image) updates.image = picture;
+
+  const providers = new Set(user.authProviders || []);
+  providers.add('google');
+  updates.authProviders = Array.from(providers);
+
+  if (Object.keys(updates).length) {
+    await this.userModel.updateOne({ _id: user._id }, updates);
+    user = await this.userModel.findById(user._id);
+  }
+}
+
+const tokens = await this.issueTokens(user);
+return { user, tokens };
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   async findAll(): Promise<userData[]> {
     const id: string = uuid();

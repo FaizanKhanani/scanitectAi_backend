@@ -2,12 +2,16 @@ import { NestFactory } from "@nestjs/core";
 import helmet from "helmet";
 import * as cookieParser from "cookie-parser";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+// import { ValidationPipe } from '@nestjs/common';
 import 'dotenv/config';
 import { AppModule } from "./app.module";
 import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  //  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
   const options = new DocumentBuilder()
     .setTitle("Jwt authentication mongoose nestjs example")
     .setDescription(

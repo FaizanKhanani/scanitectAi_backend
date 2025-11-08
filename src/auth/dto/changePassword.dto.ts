@@ -6,7 +6,7 @@ import {
   IsStrongPassword,
 } from "class-validator";
 
-export class ForgotChangePassword {
+export class ChangePassword {
    @ApiProperty({ example: 'Patil@test.com', description: 'email of the user' })
    email: string;
 

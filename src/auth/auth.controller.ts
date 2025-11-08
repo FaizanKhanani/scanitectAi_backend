@@ -11,7 +11,7 @@ import {
 import { LoggerService } from "../common/service/logger.service";
 import { SignInDto } from "./dto/signIn.dto";
 import { ForgotPasswordDto } from "./dto/forgotPasswordCodeSend.dto";
-import { ForgotChangePassword } from "./dto/forgotChangePassword.dto";
+import { ChangePassword } from "./dto/changePassword.dto";
 import { ForgotPassword } from "./dto/forgotPassword.dto";
 import { Response } from "express";
 import { AuthService } from "./auth.service";
@@ -63,6 +63,8 @@ export class AuthController {
       "/login",
       "signIn"
     );
+
+     console.log("the email", signInDto.email,"password", signInDto.password)
 
 const user = await this.userService.checkUserEmail(signInDto.email);
 
@@ -351,76 +353,77 @@ return sendResponse(
 
 
 
-    // @UseGuards(AuthGuard)
-    // @Public()
-    // @UseFilters(new HttpExceptionFilter())
-    // @Post('change-password')
-    // async forgotChangePassword(
-    //   @Body() forgotChangePasswordDto: ForgotChangePassword,
-    //   @Res() res: Response,
-    // ): Promise<any> {
-    //   const { email, oldPassword, updatedPassword  } = forgotChangePasswordDto;
+   
+    @Public()
+    @UseFilters(new HttpExceptionFilter())
+    @Post('change-password')
+    async changePassword(
+      @Body() changePasswordDto: ChangePassword,
+      @Res() res: Response,
+    ): Promise<any> {
+      const { email, oldPassword, updatedPassword  } = changePasswordDto;
       
-    //   console.log("the user email in forgot password controller", email, "old password",oldPassword,"update",updatedPassword )
+      console.log("the user email in forgot password controller", email, "old password",oldPassword,"update",updatedPassword )
 
-    //     const changePassword = await this.authService.changePassword(email, oldPassword, updatedPassword)
+        const changePassword = await this.authService.changePassword(email, oldPassword, updatedPassword)
+        console.log("changePassword", changePassword)
         
-    //     if(changePassword.success === false){
-    //          return sendResponse(
-    //     res,
-    //     HttpStatus.UNAUTHORIZED,
-    //     statusMessage[HttpStatus.UNAUTHORIZED],
-    //     false,
-    //     changePassword.message
-    //   );
+        if(changePassword.success === false){
+             return sendResponse(
+        res,
+        HttpStatus.UNAUTHORIZED,
+        statusMessage[HttpStatus.UNAUTHORIZED],
+        false,
+        changePassword.message
+      );
 
-    //     }
+        }
 
-    //     return sendResponse(
+        return sendResponse(
+        res,
+        HttpStatus.OK,
+        statusMessage[HttpStatus.OK],
+        true,
+        changePassword.message
+      );
+
+
+
+      // const response = await this.authService.resetPassword(userEmail)
+
+
+    //    console.log("the user in auth controller", response)
+
+    //    if(response.success === false){
+    //       return sendResponse(
+    //   res,
+    //   HttpStatus.UNAUTHORIZED,
+    //   statusMessage[HttpStatus.UNAUTHORIZED],
+    //   false,
+    //   {
+    //     message : 'the user is not found of this email'
+    //   }
+    // );
+
+    //    }
+
+
+
+    //     const isMAil = process.env.IS_EMAIL
+    // console.log('##############', isMAil)
+    // if (isMAil === "True") {
+    //   console.log("the email", userEmail,"otp",response.data.resetPasswordOtp)
+    //   await this.mailer.sendEmailVerification(userEmail, response.data.resetPasswordOtp)
+    // }
+     
+    //   return sendResponse(
     //     res,
     //     HttpStatus.OK,
     //     statusMessage[HttpStatus.OK],
     //     true,
-    //     changePassword.message
+    //     {  message: "the reset password code is send on you email" }
     //   );
-
-
-
-    //   // const response = await this.authService.resetPassword(userEmail)
-
-
-    // //    console.log("the user in auth controller", response)
-
-    // //    if(response.success === false){
-    // //       return sendResponse(
-    // //   res,
-    // //   HttpStatus.UNAUTHORIZED,
-    // //   statusMessage[HttpStatus.UNAUTHORIZED],
-    // //   false,
-    // //   {
-    // //     message : 'the user is not found of this email'
-    // //   }
-    // // );
-
-    // //    }
-
-
-
-    // //     const isMAil = process.env.IS_EMAIL
-    // // console.log('##############', isMAil)
-    // // if (isMAil === "True") {
-    // //   console.log("the email", userEmail,"otp",response.data.resetPasswordOtp)
-    // //   await this.mailer.sendEmailVerification(userEmail, response.data.resetPasswordOtp)
-    // // }
-     
-    // //   return sendResponse(
-    // //     res,
-    // //     HttpStatus.OK,
-    // //     statusMessage[HttpStatus.OK],
-    // //     true,
-    // //     {  message: "the reset password code is send on you email" }
-    // //   );
-    // }
+    }
 
 
 

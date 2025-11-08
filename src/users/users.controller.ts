@@ -26,6 +26,7 @@ import { UserService } from "./users.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { VerifyOtpDto } from "./dto/verify-otp.dto";
 import { ResendOtpDto } from "./dto/resend-otp.dto";
+import { GoogleLoginDto } from "./dto/google-login.dto";
 import { EditUserProfile } from "./dto/edit-user-profile.dto"
 import { Request, Response } from "express";
 import {
@@ -106,6 +107,43 @@ export class UserController {
     ); 
   }
   }
+
+
+
+  @ApiOperation({
+summary: 'Google login/signup',
+description: 'Verify Google ID token, upsert user, return app tokens',
+})
+@ApiResponse({ status: 200, description: 'Login success' })
+@ApiResponse({ status: 401, description: 'Invalid Google token' })
+@Public()
+@Post('google')
+@UseFilters(new HttpExceptionFilter())
+async googleAuth(@Body() dto: GoogleLoginDto, @Res() res: Response) {
+const id: string = uuid();
+try {
+  console.log("the id", dto.idToken)
+const result = await this.userService.loginWithGoogle(dto.idToken);
+
+console.log("the result is", result)
+return sendResponse(
+res,
+HttpStatus.OK,
+statusMessage[HttpStatus.OK],
+true,
+result
+);
+} catch (e: any) {
+return sendResponse(
+res,
+HttpStatus.UNAUTHORIZED,
+e?.message || 'Invalid Google token',
+false,
+null
+);
+}
+}
+
 
   // get user
   @ApiOperation({
