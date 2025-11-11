@@ -283,4 +283,12 @@ console.log("the user ",filteredUser);
 
 
   }
+
+
+  async deleteAccount(email: string){
+
+    console.log("the user email in forgot password service", email )
+
+  }
+
 }

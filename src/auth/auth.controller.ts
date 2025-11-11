@@ -11,6 +11,7 @@ import {
 import { LoggerService } from "../common/service/logger.service";
 import { SignInDto } from "./dto/signIn.dto";
 import { ForgotPasswordDto } from "./dto/forgotPasswordCodeSend.dto";
+import { DeleteAccount } from "./dto/deleteAccount.dto";
 import { ChangePassword } from "./dto/changePassword.dto";
 import { ForgotPassword } from "./dto/forgotPassword.dto";
 import { Response } from "express";
@@ -424,6 +425,46 @@ return sendResponse(
     //     {  message: "the reset password code is send on you email" }
     //   );
     }
+
+
+
+    @UseFilters(new HttpExceptionFilter())
+    @Post('delete-account')
+    async deleteAccount(
+      @Body() deleteAccountDto: DeleteAccount,
+      @Res() res: Response,
+    ): Promise<any> {
+      const { email} = deleteAccountDto;
+      
+      console.log("the user email in forgot password controller", email )
+
+        const deleteAccount = await this.authService.deleteAccount(email)
+        console.log("changePassword", deleteAccount)
+        
+      //   if(changePassword.success === false){
+      //        return sendResponse(
+      //   res,
+      //   HttpStatus.UNAUTHORIZED,
+      //   statusMessage[HttpStatus.UNAUTHORIZED],
+      //   false,
+      //   changePassword.message
+      // );
+
+      //   }
+
+      //   return sendResponse(
+      //   res,
+      //   HttpStatus.OK,
+      //   statusMessage[HttpStatus.OK],
+      //   true,
+      //   changePassword.message
+      // );
+    }
+
+
+
+
+
 
 
 
