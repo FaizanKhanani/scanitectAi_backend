@@ -118,17 +118,20 @@ async recognize(
 console.log("the lat", lat, "the lon",lon,"topK", topK )
   // 3. Call the service
   const results = await this.visionService.recognize(buf, { lat, lon, topK });
-
+   console.log("the result", results)
   if (results.status === 'FAILURE') {
     // Inside this block, TypeScript knows `results` is a `FailureRecognition`.
     // We handle the error and stop the function by throwing.
-    throw new BadRequestException(results.message);
+console.log("in failure")
+ return res.status(400).json({ status: 400, message: 'FAILURE', data: results.message });
+    // throw new BadRequestException(results.message);
   }
 
 
   if (results.data.length === 0) {
     // This case handles if the success data is for some reason empty.
-    throw new BadRequestException('No landmark recognized.');
+    // throw new BadRequestException('No landmark recognized.');
+    return res.status(400).json({ status: 400, message: 'FAILURE', data: 'No landmark recognized.' });
   }
 
 
@@ -173,7 +176,9 @@ console.log("the lat", lat, "the lon",lon,"topK", topK )
 
   }
 
-  throw new BadRequestException(`Failed to get landmark details of ${placeName} `);
+  // throw new BadRequestException(`Failed to get landmark details of ${placeName} `);
+
+    return res.status(400).json({ status: 400, message: 'FAILURE', data: `Failed to get landmark details of ${placeName}` });
 
 
 
