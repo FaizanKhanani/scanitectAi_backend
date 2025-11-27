@@ -93,7 +93,7 @@ console.log("the user ",filteredUser);
         },
         {
           secret: jwtConstants.secret,
-          expiresIn: '24h',
+          expiresIn: '365d',
         },
       ),
       this.jwtService.signAsync(
@@ -105,7 +105,7 @@ console.log("the user ",filteredUser);
         },
         {
           secret: jwtConstants.secret,
-          expiresIn: '30d',
+          expiresIn: '365d',
         },
       ),
     ]);
@@ -287,8 +287,31 @@ console.log("the user ",filteredUser);
 
   async deleteAccount(email: string){
 
-    console.log("the user email in forgot password service", email )
+    console.log("the user email in delete Account service", email )
 
+
+      const existingUser = await this.userModel.findOne({ email });
+
+  if (existingUser) {
+    console.log("the existing user is", existingUser)
+    console.log("⚠️ User already exists. Deleting old user...");
+     await this.userModel.deleteOne({ email });
+
+
+     return { success: true,  message: 'the user is successfully delete' }
+  }
+  
+  else if (!existingUser) {
+    console.log("the user is not found in db")
+    // console.log("⚠️ User already exists. Deleting old user...");
+   
+
+
+     return { success: true,  message: 'the user is not found in db' }
+  }
+  
+
+ return { success: false,  message: 'the user does not delete plzz try again' }
   }
 
 }

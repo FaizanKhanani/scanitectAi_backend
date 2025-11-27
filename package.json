@@ -49,9 +49,11 @@
     "nestjs-seeder": "^0.3.2",
     "node-fetch": "^2.7.0",
     "nodemailer": "^6.10.1",
+    "openai": "^6.9.0",
     "reflect-metadata": "0.1.13",
     "rimraf": "5.0.1",
     "rxjs": "7.8.1",
+    "string-similarity": "^4.0.4",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1"

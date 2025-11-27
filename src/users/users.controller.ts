@@ -79,7 +79,10 @@ export class UserController {
     const id: string = uuid();
     this.logger.log('User create api called', id, 'users.controler.ts', 'POST', '/users', 'create');
     const findUser = await this.userService.findOneUser(createCatDto.email);
-    if(!findUser){
+
+    console.log("the finduser",findUser )
+    if((!findUser) || (findUser && !findUser?.isEmailVerify)){
+    // if(!findUser){
       console.log("the data is",createCatDto, "the typeof ", typeof(createCatDto) )
     const user = await this.userService.create(createCatDto);
 

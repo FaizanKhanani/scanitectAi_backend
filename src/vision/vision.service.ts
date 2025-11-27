@@ -1,11 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException  } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ImageAnnotatorClient, protos } from '@google-cloud/vision';
 import { FilesService } from '../files/files.service';
 import { Place, PlaceDocument } from './schemas/imageData.model'
 import axios, { AxiosInstance } from 'axios';
+import { HttpService } from '@nestjs/axios';
 import fetch from 'node-fetch';
+import OpenAI from 'openai';
+import { IdentifyPlaceByNameDto } from './dto/identify-place-by-name.dto';
+// import { PlaceInfo8Dto } from './dto/place-info-8.dto';
+// import { placeInfo8JsonSchema } from './schemas/place-info-8.schema';
+import { firstValueFrom } from 'rxjs';
+import similarity from "string-similarity";
+
+interface WikipediaResult {
+  status: number;
+  title?: string;
+  message?: string;
+  error?: string;
+}
 
 type GeoPoint = { type: 'Point'; coordinates: [number, number] };
 
@@ -163,6 +177,7 @@ wikidata?: { qid?: string };
 @Injectable()
 export class VisionService {
   constructor(
+    private readonly http: HttpService,
        private readonly filesService: FilesService,
     @InjectModel('Place') private readonly placeModel: Model<any>,
     // @InjectModel(Place.name) private readonly placeModel: Model<PlaceDocument>
@@ -278,7 +293,7 @@ export class VisionService {
         return {
           status: 'FAILURE',
           reason: 'OUT_OF_ZONE',
-          message: 'You are out of zone. Please come in zone and try again.'
+          message: 'You are out of zone. Please come in 1KM radius',
         };
       }
     } else {
@@ -1669,7 +1684,7 @@ export class VisionService {
   private readonly PREFERRED_TERMS = [
     'statue','monument','landmark','building','tower','bridge','park','temple','cathedral',
     'church','mosque','museum','palace','castle','fort','arch','dam','pagoda','stupa',
-    'shrine','island','mountain','volcano','waterfall','river','bay','lake'
+    'shrine','island','mountain','volcano','waterfall','river','bay','lake','mausoleum','tomb'
   ];
 
   private readonly VANTAGE_TOKENS = [
@@ -3374,6 +3389,348 @@ return null
     };
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+//  private readonly openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+
+//  async identifyByName(dto: IdentifyPlaceByNameDto): Promise<PlaceInfo8Dto> {
+//     if (!process.env.OPENAI_API_KEY) {
+//       throw new InternalServerErrorException('OPENAI_API_KEY not set');
+//     }
+//     if (!dto.imageName?.trim()) {
+//       throw new BadRequestException('imageName is required');
+//     }
+
+//     // Try to normalize filenames like "burj_khalifa.jpg" -> "burj khalifa"
+//     const cleanedName = dto.imageName
+//       .replace(/\.[^/.]+$/, '') // remove extension
+//       .replace(/[_-]+/g, ' ')   // underscores/dashes -> spaces
+//       .trim();
+
+//     const prompt = [
+//       `You are given an "imageName" string which may be a filename or a loose name of a place or landmark.`,
+//       `Interpret it as the intended place and return ONLY JSON matching the schema.`,
+//       `Rules:`,
+//       `- Do not fabricate facts. If uncertain, use "unknown" for strings or null for numbers.`,
+//       `- real_image_url: provide a real, publicly accessible URL (prefer Wikimedia) ONLY if you are confident.`,
+//       `  If unsure, set real_image_url to null. Do not invent URLs.`,
+//       `- latitude/longitude: decimal degrees if known; else null.`,
+//       `- architect: array of names; [] if unknown.`,
+//       `- administrative_area: city/state/province/emirate; null if unknown.`,
+//       `- instance_of: categories like "Skyscraper", "Monument".`,
+//       `imageName: "${dto.imageName}"`,
+//       cleanedName !== dto.imageName ? `interpreted_place_name: "${cleanedName}"` : ''
+//     ].filter(Boolean).join('\n');
+
+//     const resp = await this.openai.responses.create({
+//       model: 'gpt-4o', // or 'gpt-4o' for best results
+//       temperature: 0,
+//       max_output_tokens: 800,
+//       response_format: { type: 'json_schema', json_schema: placeInfo8JsonSchema },
+//       input: [
+//         {
+//           role: 'user',
+//           content: [{ type: 'input_text', text: prompt }],
+//         },
+//       ],
+//     });
+
+//     console.log("the resp", resp)
+
+//     const jsonText =
+//       (resp as any).output_text ??
+//       (resp as any).output?.[0]?.content?.[0]?.text ??
+//       (resp as any).choices?.[0]?.message?.content;
+
+//     if (!jsonText) {
+//        return {
+//         status: 404,
+//         message: 'The image is not found',
+//       };
+//     }
+
+//     try {
+//       const parsed: PlaceInfo8Dto = JSON.parse(jsonText);
+//       return parsed;
+//     } catch {
+//       throw new InternalServerErrorException('Failed to parse model JSON');
+//     }
+//   }
+
+
+
+
+//  private readonly WIKI_UA = 'ScanitectAI/1.0 (+https://scanitectai.com/api; mailto:dev@scanitectai.com)';
+//   private readonly WIKI_HEADERS = {
+//     'User-Agent': this.WIKI_UA,
+//     'Accept': 'application/json'
+//   };
+
+
+
+  private readonly headers = {
+    'User-Agent': 'YourAppName/1.0 (contact: you@example.com)',
+    'Accept': 'application/json',
+  };
+
+  private cleanLabel(label: string): string {
+    return label
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // accents
+      .replace(/[’‘]/g, "'")
+      .replace(/\bmoussallem\b/gi, 'mausoleum') // common misspelling
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // 1) Wikidata search → QID (primary path)
+  private async tryWikidataSearch(query: string, lang = 'en'): Promise<string | null> {
+    const url = 'https://www.wikidata.org/w/api.php';
+    const params = {
+      action: 'wbsearchentities',
+      format: 'json',
+      language: lang,
+      type: 'item',
+      limit: '5',
+      search: query,
+      // origin: '*' // only needed for browser; server-side can omit
+    };
+    try {
+      const res = await firstValueFrom(this.http.get(url, { params, headers: this.headers }));
+      const hits = res.data?.search || [];
+      if (hits.length) {
+        // Optional: log top hits for debugging
+        // console.log('Wikidata hits:', hits.map((h: any) => `${h.id} | ${h.label} | ${h.description}`));
+        return hits[0].id as string;
+      }
+      return null;
+    } catch (e: any) {
+      console.error('Wikidata search error:',
+        e?.response?.status,
+        e?.response?.statusText,
+        e?.message,
+        e?.response?.data
+      );
+      return null;
+    }
+  }
+
+  // 2) Wikipedia search → title
+  private async wikipediaSearchTitle(query: string, lang = 'en'): Promise<string | null> {
+    const url = `https://${lang}.wikipedia.org/w/api.php`;
+    const params = {
+      action: 'query',
+      format: 'json',
+      list: 'search',
+      srsearch: query,
+      srlimit: '5',
+      srwhat: 'nearmatch',
+      srenablerewrites: '1',
+      utf8: '1',
+    };
+    try {
+      const res = await firstValueFrom(this.http.get(url, { params, headers: this.headers }));
+      const hits = res.data?.query?.search || [];
+      return hits.length ? hits[0].title as string : null;
+    } catch (e: any) {
+      console.error('Wikipedia search error:',
+        e?.response?.status,
+        e?.response?.statusText,
+        e?.message,
+        e?.response?.data
+      );
+      return null;
+    }
+  }
+
+  // 3) From a Wikipedia title → QID via pageprops
+  private async qidFromWikipediaTitle(title: string, lang = 'en'): Promise<string | null> {
+    const url = `https://${lang}.wikipedia.org/w/api.php`;
+    const params = {
+      action: 'query',
+      format: 'json',
+      prop: 'pageprops',
+      ppprop: 'wikibase_item',
+      titles: title,
+      utf8: '1',
+    };
+    try {
+      const res = await firstValueFrom(this.http.get(url, { params, headers: this.headers }));
+      const pages = res.data?.query?.pages || {};
+      const firstPage: any = Object.values(pages)[0];
+      return firstPage?.pageprops?.wikibase_item || null;
+    } catch (e: any) {
+      console.error('Wikipedia pageprops error:',
+        e?.response?.status,
+        e?.response?.statusText,
+        e?.message,
+        e?.response?.data
+      );
+      return null;
+    }
+  }
+
+  // Public: returns QID or null
+  async getQidFromLabel(noisyLabel: string, lang = 'en'): Promise<string | null> {
+    if (!noisyLabel?.trim()) return null;
+
+    // A) Wikidata search (as-is)
+    let qid = await this.tryWikidataSearch(noisyLabel, lang);
+    if (qid) return qid;
+
+    // B) Wikidata search (cleaned)
+    const cleaned = this.cleanLabel(noisyLabel);
+    if (cleaned && cleaned !== noisyLabel) {
+      qid = await this.tryWikidataSearch(cleaned, lang);
+      if (qid) return qid;
+    }
+
+    // C) Wikipedia fallback: search → pageprops → QID
+    let title = await this.wikipediaSearchTitle(noisyLabel, lang);
+    if (!title && cleaned) {
+      title = await this.wikipediaSearchTitle(cleaned, lang);
+    }
+    if (title) {
+      qid = await this.qidFromWikipediaTitle(title, lang);
+      if (qid) return qid;
+    }
+
+    return null;
+  }
+
+
+
+
+
+//      async searchTitle(label: string): Promise<WikipediaResult> {
+//     try {
+
+//       console.log("the query", label)
+// const response = await axios.get('https://en.wikipedia.org/w/api.php', {
+//   params: {
+//     action: 'query',
+//     list: 'search',
+//     srsearch: label, // make sure 'label' is not empty
+//     format: 'json',
+//   },
+// });
+
+// // log the full axios response
+// console.log("Full response:", response);
+// console.log("Response data:", response.data);
+//       const searchResults = response.data?.query?.search;
+
+
+//       if (!searchResults || searchResults.length === 0) {
+//         return {
+//           status: 404,
+//           message: 'No results found',
+//         };
+//       }
+
+//       // Return top result title
+//       return {
+//         status: 200,
+//          message: 'successfully fetch correct name',
+//         title: searchResults[0].title,
+//       };
+//     } catch (error: any) {
+//       return {
+//         status: 500,
+//         message: 'Error fetching to search this name',
+//         error: error.message,
+//       };
+//     }
+//   }
+
+
+async searchTitle(label: string): Promise<WikipediaResult> {
+  try {
+    console.log("the query", label);
+
+    const response = await axios.get('https://en.wikipedia.org/w/api.php', { 
+      params: { 
+        action: 'query', 
+        list: 'search', 
+        srsearch: label, 
+        format: 'json', 
+      },
+       headers: { 
+        'User-Agent': 'NestJS Wikipedia Search/1.0 (example@example.com)', // add a proper User-Agent 
+        }, 
+      });
+
+
+    // console.log("Response data:", response);
+
+    const searchResults = response.data?.query?.search;
+
+    console.log("thge search result", searchResults )
+
+    if (!searchResults || searchResults.length === 0) {
+      return {
+        status: 404,
+        message: 'No results found',
+      };
+    }
+
+    return {
+      status: 200,
+      message: 'Successfully fetched correct name',
+      title: searchResults[0].title,
+    };
+  } catch (error: any) {
+    console.error("Axios error:", error);
+    return {
+      status: 500,
+      message: 'Error fetching to search this name',
+      error: error.message,
+    };
+  }
+}
+
+
+// async searchTitle(label: string) {
+
+//   console.log("in here")
+//   const search = await axios.get("https://en.wikipedia.org/w/api.php", {
+//     params: {
+//       action: "query",
+//       list: "search",
+//       srsearch: label,
+//       format: "json" 
+//     },
+//      headers: { 
+//         'User-Agent': 'NestJS Wikipedia Search/1.0 (example@example.com)', // add a proper User-Agent 
+//         }, 
+//   });
+
+//   console.log("the search",search )
+
+//   const results = search.data?.query?.search || [];
+//   if (results.length === 0) return null;
+
+//   const titles = results.map(r => r.title);
+
+//   console.log("the title", titles)
+
+//   const match = similarity.findBestMatch(label, titles);
+//   const bestTitle = match.bestMatch.target;
+
+
+//   console.log("the best", bestTitle)
+//   return bestTitle;
+// }
 
 
 

@@ -19,6 +19,16 @@ import { FilesService } from '../files/files.service';
 
 
 
+
+
+
+
+
+
+
+
+
+
 @Injectable()
 export class UserService {
   private googleClient = new OAuth2Client()
@@ -31,36 +41,73 @@ export class UserService {
     private readonly filesService: FilesService,
   ) { }
 
-  async create(createUserDto: CreateUserDto): Promise<CreateUserDto> {
-    console.log("the user for signup", createUserDto)
+//   async create(createUserDto: CreateUserDto): Promise<CreateUserDto> {
+//     console.log("the user for signup", createUserDto)
     
-    const id: string = uuid();
-    this.logger.log('User service create called', id, 'users.service.ts', '', '', 'create-service');
-    const saltOrRounds = 10;
-    const hashedPassword = await bcrypt.hash(
-      createUserDto.password,
-      saltOrRounds
-    );
-    createUserDto.password = hashedPassword;
+//     const id: string = uuid();
+//     this.logger.log('User service create called', id, 'users.service.ts', '', '', 'create-service');
+//     const saltOrRounds = 10;
+//     const hashedPassword = await bcrypt.hash(
+//       createUserDto.password,
+//       saltOrRounds
+//     );
+//     createUserDto.password = hashedPassword;
 
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+//     const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
-      const expiry = new Date(Date.now() + 5 * 60 * 1000);
+//       const expiry = new Date(Date.now() + 5 * 60 * 1000);
    
+//       console.log("the expiry", expiry  )
+//      const createdUser = await this.userModel.create({
+//     ...createUserDto,
+//     otp,
+//     otpExpiry: expiry,
+//   });
 
-     const createdUser = await this.userModel.create({
+
+  
+//  console.log(`✅ OTP for ${createdUser.email}: ${otp} (expires in 5 mins)`);
+
+  
+//     return createdUser;
+//   }
+
+
+
+async create(createUserDto: CreateUserDto): Promise<CreateUserDto> {
+  console.log("User signup request:", createUserDto);
+
+  const id: string = uuid();
+  this.logger.log('User service create called', id, 'users.service.ts', '', '', 'create-service');
+
+  // Hash password
+  const saltOrRounds = 10;
+  createUserDto.password = await bcrypt.hash(createUserDto.password, saltOrRounds);
+
+  // Generate OTP & expiry
+  const otp = Math.floor(1000 + Math.random() * 9000).toString();
+  const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+
+  // 👉 STEP 1: Check if user already exists
+  const existingUser = await this.userModel.findOne({ email: createUserDto.email });
+
+  if (existingUser) {
+    console.log("the existing user is", existingUser)
+    console.log("⚠️ User already exists. Deleting old user...");
+    await this.userModel.deleteOne({ email: createUserDto.email });
+  }
+      
+  // 👉 STEP 2: Create new user
+  const createdUser = await this.userModel.create({
     ...createUserDto,
     otp,
-    otpExpiry: expiry,
-  });
+    otpExpiry
+  });                           
 
+  console.log(`✅ OTP for ${createdUser.email}: ${otp} (expires in 5 mins)`);
 
-  
- console.log(`✅ OTP for ${createdUser.email}: ${otp} (expires in 5 mins)`);
-
-  
-    return createdUser;
-  }
+  return createdUser;
+}
 
 
 
@@ -108,11 +155,11 @@ private async issueTokens(user: UserDocument) {
 const payload = { sub: user._id.toString(), role: user.role };
 const accessToken = await this.jwtService.signAsync(payload, {
 secret: process.env.JWT_SECRET,
-expiresIn: '30d',
+expiresIn: '365d',
 });
 const refreshToken = await this.jwtService.signAsync(payload, {
 secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
-expiresIn: '30d',
+expiresIn: '365d',
 });
 return { accessToken, refreshToken };
 }
@@ -209,6 +256,9 @@ return { user, tokens };
   async findOneUser(email: string): Promise<userData> {
     return this.userModel.findOne({ email: email }).exec();
   }
+
+
+
   async delete(id: string) {
     const deletedUser = await this.userModel
       .findByIdAndRemove({ _id: id })

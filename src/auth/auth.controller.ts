@@ -100,18 +100,20 @@ const response = await this.authService.signIn(
 const token = response.token;
 const userData = response.filteredUser;
 
+console.log("here user in loginnnnnn")
+
 res.cookie("access_token", token.access_token, {
   httpOnly: true,
   secure: false,
   sameSite: 'lax',
-  expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+ expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
 });
 
 res.cookie("refresh_token", token.refresh_token, {
   httpOnly: true,
   secure: false,
   sameSite: 'lax',
-  expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+ expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
 });
 
 return sendResponse(
@@ -150,14 +152,16 @@ return sendResponse(
     );
     res.cookie("access_token", token.access_token, {
       httpOnly: true,
-      expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+      // expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+      expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       path: "/",
       secure: true,
     });
 
     res.cookie("refresh_token", token.refresh_token, {
       httpOnly: true,
-      expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+      // expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+      expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       path: "/",
 
       secure: true,
@@ -434,31 +438,31 @@ return sendResponse(
       @Body() deleteAccountDto: DeleteAccount,
       @Res() res: Response,
     ): Promise<any> {
-      const { email} = deleteAccountDto;
+      const { email } = deleteAccountDto;
       
       console.log("the user email in forgot password controller", email )
 
         const deleteAccount = await this.authService.deleteAccount(email)
-        console.log("changePassword", deleteAccount)
+        console.log("the account is delete", deleteAccount)
         
-      //   if(changePassword.success === false){
-      //        return sendResponse(
-      //   res,
-      //   HttpStatus.UNAUTHORIZED,
-      //   statusMessage[HttpStatus.UNAUTHORIZED],
-      //   false,
-      //   changePassword.message
-      // );
+        if(deleteAccount.success === false){
+             return sendResponse(
+        res,
+        HttpStatus.UNAUTHORIZED,
+        '400',
+        false,
+        deleteAccount.message
+      );
 
-      //   }
+        }
 
-      //   return sendResponse(
-      //   res,
-      //   HttpStatus.OK,
-      //   statusMessage[HttpStatus.OK],
-      //   true,
-      //   changePassword.message
-      // );
+        return sendResponse(
+        res,
+        HttpStatus.OK,
+        statusMessage[HttpStatus.OK],
+        true,
+        deleteAccount.message
+      );
     }
 
 
