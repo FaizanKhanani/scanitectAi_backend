@@ -257,7 +257,7 @@ export class VisionService {
     const userLat = opts.lat;
     const userLon = opts.lon;
     const confidenceThreshold = opts.confidenceThreshold ?? 0.70;
-    const maxDistanceM = opts.maxDistanceM ?? 1000;
+    const maxDistanceM = opts.maxDistanceM ?? 10000;
 
     // 1. Gather all evidence
     const [landmarkAnns, webDetection] = await Promise.all([this.landmarkDetect(imageBuffer), this.webDetect(imageBuffer)]);
@@ -287,6 +287,9 @@ export class VisionService {
     let geographicallyValidCandidates: Candidate[];
     if (userLat != null && userLon != null) {
       geographicallyValidCandidates = allCandidates.filter(c => c.dist_m != null && c.dist_m <= maxDistanceM);
+
+    console.log("All candidates:", allCandidates);
+
 
       if (allCandidates.length > 0 && geographicallyValidCandidates.length === 0) {
         // MODIFIED: Return a logical 'FAILURE' object, not an HTTP status.
