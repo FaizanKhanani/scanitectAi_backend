@@ -131,7 +131,7 @@ console.log("in failure")
   if (results.data.length === 0) {
     // This case handles if the success data is for some reason empty.
     // throw new BadRequestException('No landmark recognized.');
-    return res.status(400).json({ status: 400, message: 'FAILURE', data: 'No landmark recognized.' });
+    return res.status(400).json({ status: 400, message: 'FAILURE', data: 'Building not recognized.' });
   }
 
 
@@ -178,7 +178,7 @@ console.log("in failure")
 
   // throw new BadRequestException(`Failed to get landmark details of ${placeName} `);
 
-    return res.status(400).json({ status: 400, message: 'FAILURE', data: `Failed to get landmark details of ${placeName}` });
+    return res.status(400).json({ status: 400, message: 'FAILURE', data: `Failed to get building details of ${placeName}` });
 
 
 

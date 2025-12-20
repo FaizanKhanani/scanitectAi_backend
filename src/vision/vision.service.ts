@@ -296,7 +296,7 @@ export class VisionService {
         return {
           status: 'FAILURE',
           reason: 'OUT_OF_ZONE',
-          message: 'You are out of zone. Please come in 1KM radius',
+          message: 'You are out of zone. Please come in 10KM radius',
         };
       }
     } else {
@@ -322,7 +322,7 @@ export class VisionService {
       return {
         status: 'FAILURE',
         reason: 'NOT_FOUND',
-        message: 'No landmark recognized. Please try again from a different angle.'
+        message: 'Building not recognized. Please try again from a different angle.'
       };
     }
 
