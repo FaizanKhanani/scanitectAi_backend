@@ -569,6 +569,24 @@ async getScansId(userId: string,) {
 
 
 
+async updateLanguageCode(userId: string, languageCode: string) {
+  const _id = userId
+    const user = await this.userModel.findByIdAndUpdate(
+      _id,
+      { languageCode },
+      { new: true }, // return updated user
+    );
+
+    if (!user) {
+      // throw new NotFoundException('User not found');
+      return { status: 401, message: 'User not found' };
+    }
+
+    return { status: 200, message: 'User update', data: user };
+  }
+
+
+
 
 
 }

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   HttpStatus,
   Param,
   Post,
@@ -29,6 +30,7 @@ import { ResendOtpDto } from "./dto/resend-otp.dto";
 import { GoogleLoginDto } from "./dto/google-login.dto";
 import { EditUserProfile } from "./dto/edit-user-profile.dto"
 import { Request, Response } from "express";
+import { UpdateLanguageCodeDto } from './dto/update-language-code.dto';
 import {
   sendResponse,
   userErrorResponse,
@@ -445,8 +447,50 @@ image: { type: 'string', format: 'binary' }, // file key
 
 
 
+        @ApiOperation({
+          summary: "fetch ",
+          description: "Get scan summary of specific user",
+        })
+        @ApiResponse({
+          status: 200,
+          description: 'Get scan summary of specific user Successfully',  })
+        @ApiResponse({ status: 403, description: "Forbidden." })
+        @UseGuards(AuthGuard)
+        @Patch('language-code/:id')
+        @UseFilters(new HttpExceptionFilter())
+  // @Patch('language-code:id')
+  async updateLanguageCode(
+    @Param('id') id: string,
+    @Body() body: UpdateLanguageCodeDto,
+     @Res() res?: Response,
+  ) {
 
+    console.log("the id", id, "languageCode", body.languageCode)
+    const updatedUser = await this.userService.updateLanguageCode(
+      id,
+      body.languageCode,
+    );
+    if(updatedUser.status === 200){
+//  return { data: updatedUser };
+     return sendResponse(
+      res,
+      HttpStatus.OK,
+      statusMessage[HttpStatus.OK],
+      true,
+      updatedUser.data
+    
+    );
+    }
 
+         return sendResponse(
+        res,
+        HttpStatus.BAD_REQUEST,
+        updatedUser.message,
+        // 'Invalid or expired OTP.',
+        false,
+      );
+   
+  }
 
 
 

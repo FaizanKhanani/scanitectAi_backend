@@ -132,6 +132,8 @@ role: string;
 @Prop({ nullable: true })
 otp: string;
 
+
+
 @Prop({ type: [String], default: [] })
 scanAreas?: string[];
 
@@ -167,6 +169,10 @@ remainCredits: string;
 
 @Prop({ type: String, default: '10' })
 totalCredit: string;
+
+@Prop({ type: String, default: 'en' })
+languageCode: string;
+
 
 // NEW: Provider fields
 @Prop({ type: String, unique: true, sparse: true })
