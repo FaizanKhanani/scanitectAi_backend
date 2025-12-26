@@ -31,6 +31,7 @@ import {
 } from "@nestjs/swagger";
 import { UserService } from "../users/users.service";
 import { VisionService } from './vision.service';
+import { TranslationService } from '../translation/translate.service';
 
 type MulterFile = Express.Multer.File; // <-- define alias here
 
@@ -48,6 +49,7 @@ export class VisionController {
   constructor(
     private readonly visionService: VisionService,
     private readonly userService: UserService,
+    private readonly translationService: TranslationService,
   ) {}
 
 
@@ -334,55 +336,44 @@ async getDataFromWikipedia(
 
 
 
+@UseGuards(AuthGuard)
+@Get('get-scan/:id')
+async getSingleScans(@Param('id') id: string, @Req() req, @Res() res: Response) {
+  try {
+    const getScanDetail = await this.visionService.getScansDetails(id);
 
-                @ApiOperation({
-          summary: "fetch ",
-          description: "Get detail of any scan of specific user",
-        })
-        @ApiResponse({
-          status: 200,
-          description: 'Get detail of scan of specific user Successfully',  })
-        @ApiResponse({ status: 403, description: "Forbidden." })
-        @UseGuards(AuthGuard)
-        @Get('get-scan/:id')
-        @UseFilters(new HttpExceptionFilter())
-        async getSingleScans(@Param('id') id: string, @Req() req, @Res() res: Response): Promise<any> {
+    if (getScanDetail.status !== 200) {
+      return res.status(400).json({
+        status: getScanDetail.status,
+        message: getScanDetail.message,
+        data: getScanDetail.error,
+      });
+    }
 
+    const userId = req.user.sub;
+    const user = await this.userService.findOne(userId);
 
-           console.log("the id", id)
+    const translated = await this.translationService.translateData(
+      getScanDetail.scanDetail,
+      user.languageCode,
+    );
 
-           const getScanDetail = await this.visionService.getScansDetails(id)
-
-      
-          // const userId = req.user.sub;
-          // console.log("the user is in getLoginUserData", userId)
-      
-      
-          // const response = await this.userService.getScansId(userId)
-      
-          console.log("the response in get scans ", getScanDetail)
-
-
-          if(getScanDetail.status === 200){
-
-
-                return res.status(200).json({
+    return res.status(200).json({
       status: getScanDetail.status,
       message: getScanDetail.message,
-      data: getScanDetail.scanDetail,
+      data: translated,
     });
+  } catch (error) {
+    console.error('Error in getSingleScans:', error);
 
-          }
-   
-      
-          return res.status(400).json({
-   status: getScanDetail.status,
-      message: getScanDetail.message,
-    data: getScanDetail.error,
-  });
-      
-      
-        }
+    // Decide what you want to send if translation fails
+    return res.status(502).json({
+      status: 502,
+      message: 'Failed to translate scan detail',
+      // optionally include more info in dev env
+    });
+  }
+}
  
         
 

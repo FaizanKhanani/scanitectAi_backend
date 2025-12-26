@@ -5,6 +5,7 @@ import { HttpModule } from '@nestjs/axios';
 import { VisionController } from './vision.controller';
 import { UserService } from "../users/users.service";
 import { UserModule } from "../users/users.module";
+import { TranslationModule } from "../translation/translate.module";
 import { FilesModule } from "../files/files.module";
 import { VisionService } from './vision.service';
 import { CommonModule } from '../common/common.module';
@@ -15,6 +16,7 @@ import { CommonModule } from '../common/common.module';
       FilesModule,
     MongooseModule.forFeature([{ name: Place.name, schema: PlaceSchema }]),
     UserModule,
+    TranslationModule,
     CommonModule, // ✅ Add this
   ],
   controllers: [VisionController],
