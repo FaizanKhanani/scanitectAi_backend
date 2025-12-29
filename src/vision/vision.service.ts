@@ -2245,6 +2245,8 @@ const remoteThumbUrl: string | undefined =
 const filteredDetail = {
       id :  response?._id,
       title: response?.title,
+         wikipediaThumbImage:response?.images?.thumbnail,
+      wikipediaOriginalImage:response?.images?.original,
       thumbnailImage: response?.images?.local_thumbnail,
       originalImage: response?.images?.local_original,
       description: response?.description_long,
@@ -2304,6 +2306,8 @@ if(getDetail){
 const filteredDetail = {
       id :  getDetail?._id,
       title: getDetail?.title,
+         wikipediaThumbImage:getDetail?.images?.thumbnail,
+      wikipediaOriginalImage:getDetail?.images?.original,
       thumbnailImage: getDetail?.images?.local_thumbnail,
       originalImage: getDetail?.images?.local_original,
       description: getDetail?.description_long,
@@ -2380,6 +2384,8 @@ return null
     const filterDocument = {
         id :  response?._id,
       title: response?.title,
+      wikipediaThumbImage:response?.images?.thumbnail,
+      wikipediaOriginalImage:response?.images?.original,
       thumbnailImage: response?.images?.local_thumbnail,
       originalImage: response?.images?.local_original,
       description: response?.description_long,
