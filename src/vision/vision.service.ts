@@ -13,6 +13,8 @@ import { IdentifyPlaceByNameDto } from './dto/identify-place-by-name.dto';
 // import { placeInfo8JsonSchema } from './schemas/place-info-8.schema';
 import { firstValueFrom } from 'rxjs';
 import similarity from "string-similarity";
+import * as sharp from 'sharp';
+import { Readable } from 'stream';
 
 interface WikipediaResult {
   status: number;
@@ -813,27 +815,6 @@ public async recognize(
     return picked.slice(0, Math.max(min, Math.min(max, picked.length)));
   }
 
-  // private async mirrorImageToLocal(remoteUrl: string, filename?: string): Promise<string | null> {
-  //   try {
-  //     const res = await axios.post(
-  //       this.FILES_MIRROR_URL,
-  //       { url: remoteUrl, filename },
-  //       {
-  //         headers: {
-  //           ...(this.FILES_AUTH_TOKEN ? { Authorization: this.FILES_AUTH_TOKEN } : {}),
-  //           'Content-Type': 'application/json'
-  //         },
-  //         timeout: 20000
-  //       }
-  //     );
-  //     const localUrl = res.data?.url || res.data?.data?.url;
-  //     return localUrl || null;
-  //   } catch {
-  //     return null;
-  //   }
-  // }
-
-  // --- Wikipedia/Wikidata helpers ---
 
 private async mirrorImageToLocal(remoteUrl: string, filename?: string): Promise<string | null> {
   try {
@@ -1383,72 +1364,76 @@ private async mirrorImageToLocal(remoteUrl: string, filename?: string): Promise<
 
   // --- main ---
 
-  async getDetail(
-    PlaceName: string,
-    opts: { longDescriptionChars?: number; lang?: string } = {}
-  ) {
-    const { longDescriptionChars = 1500, lang = 'en' } = opts;
+async getDetail(
+  PlaceName: string,
+  opts: { longDescriptionChars?: number; lang?: string } = {}
+) {
+  const { longDescriptionChars = 1500, lang = 'en' } = opts;
 
-    const parseWikidataPoint = (wkt?: string) => {
-      if (!wkt) return null;
-      const m = wkt.match(/Point\(([-\d.]+)\s+([-\d.]+)\)/);
-      return m ? { lat: Number(m[2]), lon: Number(m[1]) } : null;
-    };
-    const toNumber = (v?: string) => {
-      if (v == null) return undefined;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : undefined;
-    };
+  const parseWikidataPoint = (wkt?: string) => {
+    if (!wkt) return null;
+    const m = wkt.match(/Point\(([-\d.]+)\s+([-\d.]+)\)/);
+    return m ? { lat: Number(m[2]), lon: Number(m[1]) } : null;
+  };
+  const toNumber = (v?: string) => {
+    if (v == null) return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
 
-    try {
-      // Resolve canonical Wikipedia title first
-      const resolved = await this.resolveWikipedia(PlaceName, lang);
-      if (!resolved) {
-        return { status: 404, statusMessage: 'not_found', data: `No "${PlaceName}" data is found on Wikipedia` };
-      }
-      const resolvedTitle = resolved.title;
-      const wikiData = resolved.summary;
-
-      // Longer description
-      let longDescription = '';
-      try {
-        const extractRes = await this.wiki.get(`https://${lang}.wikipedia.org/w/api.php`, {
-          params: {
-            action: 'query',
-            prop: 'extracts',
-            explaintext: 1,
-            exchars: longDescriptionChars,
-            redirects: 1,
-            titles: resolvedTitle,
-            format: 'json',
-            origin: '*'
-          }
-        });
-        const pages = extractRes.data?.query?.pages;
-        const firstKey = pages ? Object.keys(pages)[0] : undefined;
-        longDescription = firstKey ? pages[firstKey]?.extract || '' : '';
-      } catch (e: any) {
-        console.warn('Extended description fetch failed:', e?.message || e);
-      }
-
-      // Wikidata enrichment
-      let wd = {
-        qid: wikiData.wikibase_item || '',
-        instance_of: '',
-        countries: [] as string[],
-        administrative_areas: [] as string[],
-        ranges: [] as string[],
-        elevation_m: undefined as number | undefined,
-        height_m: undefined as number | undefined,
-        prominence_m: undefined as number | undefined,
-        isolation_km: undefined as number | undefined,
-        architects: [] as string[],
-        coordinates: null as null | { lat: number; lon: number }
+  try {
+    // Resolve canonical Wikipedia title first
+    const resolved = await this.resolveWikipedia(PlaceName, lang);
+    if (!resolved) {
+      return {
+        status: 404,
+        statusMessage: 'not_found',
+        data: `No "${PlaceName}" data is found on Wikipedia`,
       };
+    }
+    const resolvedTitle = resolved.title;
+    const wikiData = resolved.summary;
 
-      if (wikiData.wikibase_item) {
-        const qid = wikiData.wikibase_item;
-        const sparqlQuery = `
+    // Longer description
+    let longDescription = '';
+    try {
+      const extractRes = await this.wiki.get(`https://${lang}.wikipedia.org/w/api.php`, {
+        params: {
+          action: 'query',
+          prop: 'extracts',
+          explaintext: 1,
+          exchars: longDescriptionChars,
+          redirects: 1,
+          titles: resolvedTitle,
+          format: 'json',
+          origin: '*',
+        },
+      });
+      const pages = extractRes.data?.query?.pages;
+      const firstKey = pages ? Object.keys(pages)[0] : undefined;
+      longDescription = firstKey ? pages[firstKey]?.extract || '' : '';
+    } catch (e: any) {
+      console.warn('Extended description fetch failed:', e?.message || e);
+    }
+
+    // Wikidata enrichment
+    let wd = {
+      qid: wikiData.wikibase_item || '',
+      instance_of: '',
+      countries: [] as string[],
+      administrative_areas: [] as string[],
+      ranges: [] as string[],
+      elevation_m: undefined as number | undefined,
+      height_m: undefined as number | undefined,
+      prominence_m: undefined as number | undefined,
+      isolation_km: undefined as number | undefined,
+      architects: [] as string[],
+      coordinates: null as null | { lat: number; lon: number },
+    };
+
+    if (wikiData.wikibase_item) {
+      const qid = wikiData.wikibase_item;
+      const sparqlQuery = `
           SELECT DISTINCT
             ?coord ?elev ?height ?prom ?iso
             ?countryLabel ?adminLabel ?range1Label ?range2Label
@@ -1476,233 +1461,259 @@ private async mirrorImageToLocal(remoteUrl: string, filename?: string): Promise<
           LIMIT 100
         `;
 
-        let sparqlWorked = false;
+      let sparqlWorked = false;
 
-        try {
-          const sparqlResponse = await axios.get('https://query.wikidata.org/sparql', {
-            headers: {
-              Accept: 'application/sparql-results+json',
-              'User-Agent': this.WIKI_UA
-            },
-            params: { query: sparqlQuery },
-            timeout: 12000
-          });
+      try {
+        const sparqlResponse = await axios.get('https://query.wikidata.org/sparql', {
+          headers: {
+            Accept: 'application/sparql-results+json',
+            'User-Agent': this.WIKI_UA,
+          },
+          params: { query: sparqlQuery },
+          timeout: 12000,
+        });
 
-          const rows = sparqlResponse.data?.results?.bindings ?? [];
+        const rows = sparqlResponse.data?.results?.bindings ?? [];
 
-          const countriesSet = new Set<string>();
-          const adminsSet = new Set<string>();
-          const rangesSet = new Set<string>();
-          const instancesSet = new Set<string>();
-          const architectsSet = new Set<string>();
+        const countriesSet = new Set<string>();
+        const adminsSet = new Set<string>();
+        const rangesSet = new Set<string>();
+        const instancesSet = new Set<string>();
+        const architectsSet = new Set<string>();
 
-          let coord: { lat: number; lon: number } | null = null;
-          let elevation_m: number | undefined;
-          let height_m: number | undefined;
-          let prominence_m: number | undefined;
-          let isolation_km: number | undefined;
+        let coord: { lat: number; lon: number } | null = null;
+        let elevation_m: number | undefined;
+        let height_m: number | undefined;
+        let prominence_m: number | undefined;
+        let isolation_km: number | undefined;
 
-          for (const b of rows) {
-            if (b.countryLabel?.value) countriesSet.add(b.countryLabel.value);
-            if (b.adminLabel?.value) adminsSet.add(b.adminLabel.value);
-            if (b.range1Label?.value) rangesSet.add(b.range1Label.value);
-            if (b.range2Label?.value) rangesSet.add(b.range2Label.value);
-            if (b.instanceLabel?.value) instancesSet.add(b.instanceLabel.value);
-            if (b.architectLabel?.value) architectsSet.add(b.architectLabel.value);
+        for (const b of rows) {
+          if (b.countryLabel?.value) countriesSet.add(b.countryLabel.value);
+          if (b.adminLabel?.value) adminsSet.add(b.adminLabel.value);
+          if (b.range1Label?.value) rangesSet.add(b.range1Label.value);
+          if (b.range2Label?.value) rangesSet.add(b.range2Label.value);
+          if (b.instanceLabel?.value) instancesSet.add(b.instanceLabel.value);
+          if (b.architectLabel?.value) architectsSet.add(b.architectLabel.value);
 
-            if (!coord && b.coord?.value) coord = parseWikidataPoint(b.coord.value);
-            if (elevation_m === undefined && b.elev?.value) elevation_m = toNumber(b.elev.value);
-            if (height_m === undefined && b.height?.value) height_m = toNumber(b.height.value);
-            if (prominence_m === undefined && b.prom?.value) prominence_m = toNumber(b.prom.value);
-            if (isolation_km === undefined && b.iso?.value) isolation_km = toNumber(b.iso.value);
-          }
+          if (!coord && b.coord?.value) coord = parseWikidataPoint(b.coord.value);
+          if (elevation_m === undefined && b.elev?.value) elevation_m = toNumber(b.elev.value);
+          if (height_m === undefined && b.height?.value) height_m = toNumber(b.height.value);
+          if (prominence_m === undefined && b.prom?.value)
+            prominence_m = toNumber(b.prom.value);
+          if (isolation_km === undefined && b.iso?.value) isolation_km = toNumber(b.iso.value);
+        }
 
+        wd = {
+          qid,
+          instance_of: Array.from(instancesSet).join(', '),
+          countries: Array.from(countriesSet),
+          administrative_areas: Array.from(adminsSet),
+          ranges: Array.from(rangesSet),
+          elevation_m,
+          height_m,
+          prominence_m,
+          isolation_km,
+          architects: Array.from(architectsSet),
+          coordinates: coord,
+        };
+
+        sparqlWorked = true;
+      } catch (sparqlErr: any) {
+        console.warn('Wikidata SPARQL failed:', sparqlErr?.message || sparqlErr);
+      }
+
+      if (
+        !sparqlWorked ||
+        (!wd.countries.length &&
+          !wd.administrative_areas.length &&
+          !wd.height_m &&
+          !wd.elevation_m)
+      ) {
+        const apiFallback = await this.fetchWikidataViaAPI(qid);
+        if (apiFallback) {
           wd = {
             qid,
-            instance_of: Array.from(instancesSet).join(', '),
-            countries: Array.from(countriesSet),
-            administrative_areas: Array.from(adminsSet),
-            ranges: Array.from(rangesSet),
-            elevation_m,
-            height_m,
-            prominence_m,
-            isolation_km,
-            architects: Array.from(architectsSet),
-            coordinates: coord
-          };
-
-          sparqlWorked = true;
-        } catch (sparqlErr: any) {
-          console.warn('Wikidata SPARQL failed:', sparqlErr?.message || sparqlErr);
-        }
-
-        if (!sparqlWorked || (!wd.countries.length && !wd.administrative_areas.length && !wd.height_m && !wd.elevation_m)) {
-          const apiFallback = await this.fetchWikidataViaAPI(qid);
-          if (apiFallback) {
-            wd = {
-              qid,
-              instance_of: apiFallback.instance_of || wd.instance_of,
-              countries: apiFallback.countries?.length ? apiFallback.countries : wd.countries,
-              administrative_areas: apiFallback.administrative_areas?.length ? apiFallback.administrative_areas : wd.administrative_areas,
-              ranges: apiFallback.ranges?.length ? apiFallback.ranges : wd.ranges,
-              elevation_m: apiFallback.elevation_m ?? wd.elevation_m,
-              height_m: apiFallback.height_m ?? wd.height_m,
-              prominence_m: apiFallback.prominence_m ?? wd.prominence_m,
-              isolation_km: apiFallback.isolation_km ?? wd.isolation_km,
-              architects: apiFallback.architects?.length ? apiFallback.architects : wd.architects,
-              coordinates: apiFallback.coordinates ?? wd.coordinates
-            };
-          }
-        }
-      }
-
-      const coords =
-        wd.coordinates ||
-        (wikiData.coordinates ? { lat: wikiData.coordinates.lat, lon: wikiData.coordinates.lon } : null);
-
-      const baseName = wikiData.title || resolvedTitle;
-
-      // Build candidates: same-lang page gallery
-      const sameLangGallery = await this.fetchPageGallery(resolvedTitle, lang, 100);
-
-      // Cross-language galleries (from other Wikipedia language pages)
-      let crossLang: WikiImage[] = [];
-      if (wikiData.wikibase_item) {
-        crossLang = await this.fetchCrossLangGalleries(wd.qid || wikiData.wikibase_item).catch(() => []);
-      }
-
-      // Commons images (category + subcategories + gallery)
-      let commonsImages: WikiImage[] = [];
-      if (wikiData.wikibase_item) {
-        const commonsLinks = await this.fetchCommonsLinksFromWikidata(wd.qid || wikiData.wikibase_item);
-
-        // Category root + subcats (paginated)
-        const catDeepChunks = await this.mapWithConcurrency(
-          commonsLinks.categories.slice(0, 2),
-          this.MAX_CONCURRENCY,
-          (c) => this.fetchCommonsCategoryImagesDeep(c, 200, 5).catch(() => [])
-        );
-        for (const arr of catDeepChunks) commonsImages.push(...arr);
-
-        // Galleries
-        const galImgsChunks = await this.mapWithConcurrency(
-          commonsLinks.galleries.slice(0, 2),
-          this.MAX_CONCURRENCY,
-          (g) => this.fetchCommonsGalleryImages(g, 200).catch(() => [])
-        );
-        for (const arr of galImgsChunks) commonsImages.push(...arr);
-      }
-
-      // Merge + dedupe initial pool
-      let allCandidates: WikiImage[] = [...sameLangGallery, ...crossLang, ...commonsImages];
-      allCandidates = this.dedupeImages(allCandidates);
-
-      // If still likely low, search Commons by title as a fallback
-      if (allCandidates.length < this.MIN_IMAGES) {
-        const searchImgs = await this.fetchCommonsSearchImages(baseName, 200).catch(() => []);
-        allCandidates = this.dedupeImages([...allCandidates, ...searchImgs]);
-      }
-
-      // Select diverse set with fallback to looser filter if needed
-      let diverse = this.selectDiverseImages(allCandidates, baseName, this.MIN_IMAGES, 16);
-      if (diverse.length < this.MIN_IMAGES) {
-        const loosePick = this.selectDiverseImages(allCandidates, baseName, this.MIN_IMAGES, 16, (img) => !this.looksBadForBuildingLoose(img));
-        if (loosePick.length > diverse.length) diverse = loosePick;
-      }
-
-      // Final fill to ensure we reach MIN_IMAGES if still short
-      if (diverse.length < this.MIN_IMAGES) {
-        const seen = new Set<string>(diverse.map(i => ((i.sha1 || i.original) || '').toLowerCase()));
-        for (const img of allCandidates) {
-          const key = ((img.sha1 || img.original) || '').toLowerCase();
-          if (!seen.has(key)) {
-            diverse.push(img);
-            seen.add(key);
-          }
-          if (diverse.length >= this.MIN_IMAGES) break;
-        }
-      }
-
-      // Lead image: prefer summary lead if good
-      const summaryLead = wikiData?.originalimage?.source
-        ? {
-            title: `File:${baseName}.jpg`,
-            original: wikiData.originalimage.source,
-            thumb: wikiData.thumbnail?.source || wikiData.originalimage.source,
-            width: undefined,
-            height: undefined,
-            mime: undefined,
-            mediatype: 'BITMAP',
-            sha1: undefined
-          } as WikiImage
-        : null;
-
-      const lead = summaryLead && !this.looksBadForBuilding(summaryLead)
-        ? summaryLead
-        : (diverse[0] || summaryLead || null);
-
-      // Mirror lead + at least 6 diverse images
-      let localLeadOriginal: string | null = null;
-      let localLeadThumb: string | null = null;
-      if (lead?.original) localLeadOriginal = await this.mirrorImageToLocal(lead.original);
-      if (lead?.thumb) localLeadThumb = await this.mirrorImageToLocal(lead.thumb || lead.original);
-
-      const toMirror = diverse.slice(0, Math.max(this.MIN_IMAGES, Math.min(12, diverse.length)));
-
-      // Lower concurrency for mirroring + fallback to remote if mirror fails
-      const galleryWithLocal = await this.mapWithConcurrency(
-        toMirror,
-        this.MIRROR_CONCURRENCY,
-        async (img) => {
-          const localOriginal = await this.mirrorImageToLocal(img.original);
-          const localThumb = img.thumb ? await this.mirrorImageToLocal(img.thumb) : null;
-          return {
-            title: img.title,
-            original: img.original,
-            thumbnail: img.thumb || img.original,
-
-            // snake_case
-            local_original: localOriginal || img.original,
-            local_thumbnail: localThumb || img.thumb || img.original,
-
-            // camelCase (matches your schema)
-            localOriginal: localOriginal || img.original,
-            localThumbnail: localThumb || img.thumb || img.original
+            instance_of: apiFallback.instance_of || wd.instance_of,
+            countries: apiFallback.countries?.length
+              ? apiFallback.countries
+              : wd.countries,
+            administrative_areas: apiFallback.administrative_areas?.length
+              ? apiFallback.administrative_areas
+              : wd.administrative_areas,
+            ranges: apiFallback.ranges?.length ? apiFallback.ranges : wd.ranges,
+            elevation_m: apiFallback.elevation_m ?? wd.elevation_m,
+            height_m: apiFallback.height_m ?? wd.height_m,
+            prominence_m: apiFallback.prominence_m ?? wd.prominence_m,
+            isolation_km: apiFallback.isolation_km ?? wd.isolation_km,
+            architects: apiFallback.architects?.length
+              ? apiFallback.architects
+              : wd.architects,
+            coordinates: apiFallback.coordinates ?? wd.coordinates,
           };
         }
+      }
+    }
+
+    const coords =
+      wd.coordinates ||
+      (wikiData.coordinates
+        ? { lat: wikiData.coordinates.lat, lon: wikiData.coordinates.lon }
+        : null);
+
+    const baseName = wikiData.title || resolvedTitle;
+
+    // Build candidates: same-lang page gallery
+    const sameLangGallery = await this.fetchPageGallery(resolvedTitle, lang, 100);
+
+    // Cross-language galleries (from other Wikipedia language pages)
+    let crossLang: WikiImage[] = [];
+    if (wikiData.wikibase_item) {
+      crossLang = await this.fetchCrossLangGalleries(
+        wd.qid || wikiData.wikibase_item,
+      ).catch(() => []);
+    }
+
+    // Commons images (category + subcategories + gallery)
+    let commonsImages: WikiImage[] = [];
+    if (wikiData.wikibase_item) {
+      const commonsLinks = await this.fetchCommonsLinksFromWikidata(
+        wd.qid || wikiData.wikibase_item,
       );
 
-      const data = {
-        title: wikiData.title || resolvedTitle,
-        description_short: wikiData.extract || '',
-        description_html: wikiData.extract_html || '',
-        description_long: longDescription,
-        page_url: wikiData.content_urls?.desktop?.page || '',
-        images: {
-          thumbnail: lead?.thumb || wikiData.thumbnail?.source || '',
-          original: lead?.original || wikiData.originalimage?.source || '',
+      // Category root + subcats (paginated)
+      const catDeepChunks = await this.mapWithConcurrency(
+        commonsLinks.categories.slice(0, 2),
+        this.MAX_CONCURRENCY,
+        c =>
+          this.fetchCommonsCategoryImagesDeep(c, 200, 5).catch(() => []),
+      );
+      for (const arr of catDeepChunks) commonsImages.push(...arr);
 
-          // snake_case
-          local_thumbnail: localLeadThumb || lead?.thumb || wikiData.thumbnail?.source || '',
-          local_original: localLeadOriginal || lead?.original || wikiData.originalimage?.source || '',
-
-          // camelCase (matches your schema)
-          localThumbnail: localLeadThumb || lead?.thumb || wikiData.thumbnail?.source || '',
-          localOriginal: localLeadOriginal || lead?.original || wikiData.originalimage?.source || '',
-
-          gallery: Array.isArray(galleryWithLocal) ? galleryWithLocal : []
-        },
-        coordinates: coords,
-        wikidata: wd
-      };
-
-      return { status: 200, statusMessage: 'success', data };
-    } catch (err: any) {
-      console.warn('Wikipedia lookup failed:', err?.message || err);
-      return { status: err?.response?.status || 500, statusMessage: 'error', data: 'Error fetching data' };
+      // Galleries
+      const galImgsChunks = await this.mapWithConcurrency(
+        commonsLinks.galleries.slice(0, 2),
+        this.MAX_CONCURRENCY,
+        g => this.fetchCommonsGalleryImages(g, 200).catch(() => []),
+      );
+      for (const arr of galImgsChunks) commonsImages.push(...arr);
     }
-  }
 
+    // Merge + dedupe initial pool
+    let allCandidates: WikiImage[] = [...sameLangGallery, ...crossLang, ...commonsImages];
+    allCandidates = this.dedupeImages(allCandidates);
+
+    // If still likely low, search Commons by title as a fallback
+    if (allCandidates.length < this.MIN_IMAGES) {
+      const searchImgs = await this.fetchCommonsSearchImages(baseName, 200).catch(
+        () => [],
+      );
+      allCandidates = this.dedupeImages([...allCandidates, ...searchImgs]);
+    }
+
+    // Select diverse set with fallback to looser filter if needed
+    let diverse = this.selectDiverseImages(
+      allCandidates,
+      baseName,
+      this.MIN_IMAGES,
+      16,
+    );
+    if (diverse.length < this.MIN_IMAGES) {
+      const loosePick = this.selectDiverseImages(
+        allCandidates,
+        baseName,
+        this.MIN_IMAGES,
+        16,
+        img => !this.looksBadForBuildingLoose(img),
+      );
+      if (loosePick.length > diverse.length) diverse = loosePick;
+    }
+
+    // Final fill to ensure we reach MIN_IMAGES if still short
+    if (diverse.length < this.MIN_IMAGES) {
+      const seen = new Set<string>(
+        diverse.map(i => ((i.sha1 || i.original) || '').toLowerCase()),
+      );
+      for (const img of allCandidates) {
+        const key = ((img.sha1 || img.original) || '').toLowerCase();
+        if (!seen.has(key)) {
+          diverse.push(img);
+          seen.add(key);
+        }
+        if (diverse.length >= this.MIN_IMAGES) break;
+      }
+    }
+
+    // Lead image: prefer summary lead if good
+    const summaryLead = wikiData?.originalimage?.source
+      ? ({
+          title: `File:${baseName}.jpg`,
+          original: wikiData.originalimage.source,
+          thumb: wikiData.thumbnail?.source || wikiData.originalimage.source,
+          width: undefined,
+          height: undefined,
+          mime: undefined,
+          mediatype: 'BITMAP',
+          sha1: undefined,
+        } as WikiImage)
+      : null;
+
+    const lead =
+      summaryLead && !this.looksBadForBuilding(summaryLead)
+        ? summaryLead
+        : diverse[0] || summaryLead || null;
+
+    // IMPORTANT: do NOT mirror / download images here.
+    const localLeadOriginal: string | null = null;
+    const localLeadThumb: string | null = null;
+
+    const galleryWithLocal = diverse
+      .slice(0, Math.max(this.MIN_IMAGES, Math.min(12, diverse.length)))
+      .map(img => ({
+        title: img.title,
+        original: img.original,
+        thumbnail: img.thumb || img.original,
+
+        // "local" fields are just remote URLs for now.
+        // Real local URLs will be created in upsertPlaceFromDetail.
+        local_original: img.original,
+        local_thumbnail: img.thumb || img.original,
+        localOriginal: img.original,
+        localThumbnail: img.thumb || img.original,
+      }));
+
+    const data = {
+      title: wikiData.title || resolvedTitle,
+      description_short: wikiData.extract || '',
+      description_html: wikiData.extract_html || '',
+      description_long: longDescription,
+      page_url: wikiData.content_urls?.desktop?.page || '',
+      images: {
+        thumbnail: lead?.thumb || wikiData.thumbnail?.source || '',
+        original: lead?.original || wikiData.originalimage?.source || '',
+
+        // For convenience, mirror remote URLs here; they'll be replaced
+        // with real local URLs in upsertPlaceFromDetail.
+        local_thumbnail: localLeadThumb || lead?.thumb || wikiData.thumbnail?.source || '',
+        local_original: localLeadOriginal || lead?.original || wikiData.originalimage?.source || '',
+        localThumbnail: localLeadThumb || lead?.thumb || wikiData.thumbnail?.source || '',
+        localOriginal: localLeadOriginal || lead?.original || wikiData.originalimage?.source || '',
+
+        gallery: Array.isArray(galleryWithLocal) ? galleryWithLocal : [],
+      },
+      coordinates: coords,
+      wikidata: wd,
+    };
+
+    return { status: 200, statusMessage: 'success', data };
+  } catch (err: any) {
+    console.warn('Wikipedia lookup failed:', err?.message || err);
+    return {
+      status: err?.response?.status || 500,
+      statusMessage: 'error',
+      data: 'Error fetching data',
+    };
+  }
+}
 
 
 
@@ -1778,27 +1789,6 @@ private async mirrorImageToLocal(remoteUrl: string, filename?: string): Promise<
 }
 
 
-  // private extractImageUrl(detail: any): string | undefined {
-  //   if (!detail) return undefined;
-
-  //   // Common Wikipedia shapes:
-  //   // - detail.image
-  //   // - detail.thumbnail?.source
-  //   // - detail.originalimage?.source
-  //   // - detail.images?.[0]?.source or .url
-  //   if (typeof detail.image === 'string' && this.isHttpUrl(detail.image)) return detail.image;
-  //   if (this.isHttpUrl(detail?.thumbnail?.source)) return detail.thumbnail.source;
-  //   if (this.isHttpUrl(detail?.originalimage?.source)) return detail.originalimage.source;
-
-  //   if (Array.isArray(detail.images)) {
-  //     for (const i of detail.images) {
-  //       const u = i?.source || i?.url;
-  //       if (this.isHttpUrl(u)) return u;
-  //     }
-  //   }
-
-  //   return undefined;
-  // }
 
 
   private extractImageUrl(detail: any): string | undefined {
@@ -1822,106 +1812,6 @@ private async mirrorImageToLocal(remoteUrl: string, filename?: string): Promise<
 
   return undefined;
 }
-
-
-
-//   private async downloadAndStoreImage(imageUrl: string, placeId?: string, placeName?: string) {
-//   const allowedMimes = new Set([
-//     'image/png',
-//     'image/jpeg',
-//     'image/webp',
-//     'image/gif',
-//     'image/heic',
-//     'image/heif',
-//     'image/svg+xml',
-//     'image/bmp',
-//   ]);
-
-//   const resp = await axios.get(imageUrl, {
-//     responseType: 'stream',
-//     timeout: 20000,
-//     maxBodyLength: Infinity,     // remove stream size limit
-//     maxContentLength: Infinity,  // extra safety for axios versions
-//     validateStatus: (s) => s >= 200 && s < 400,
-//   });
-
-//   const mimeType = String(resp.headers['content-type'] || 'image/jpeg').toLowerCase();
-//   if (!allowedMimes.has(mimeType)) {
-//     throw new Error(`Unsupported image type from Wikipedia: ${mimeType}`);
-//   }
-
-//   const ext = this.extFromUrl(imageUrl) || this.extFromMime(mimeType) || 'jpg';
-//   const filename = `${this.sanitizeFilename(placeName || 'place')}-${Date.now()}.${ext}`;
-
-//   const { fileId } = await this.filesService.uploadFromStream(
-//     resp.data,
-//     filename,
-//     mimeType,
-//     { source: 'wikipedia', imageUrl, placeId, placeName },
-//     'avatars',
-//   );
-
-//   console.log("the field id",fileId)
-//   return {
-//     fileId,
-//     localUrl: this.buildFileUrl(fileId),
-//     mimeType,
-//     filename,
-//   };
-// }
-
-
-// private async downloadAndStoreImage(imageUrl: string, placeId?: string, placeName?: string) {
-//   const allowedMimes = new Set([
-//     'image/png',
-//     'image/jpeg',
-//     'image/webp',
-//     'image/gif',
-//     'image/heic',
-//     'image/heif',
-//     'image/svg+xml',
-//     'image/bmp',
-//   ]);
-
-//   const resp = await axios.get(imageUrl, {
-//     responseType: 'stream',
-//     timeout: 20000,
-//     maxBodyLength: Infinity,
-//     maxContentLength: Infinity,
-//     validateStatus: (s) => s >= 200 && s < 400,
-//     headers: {
-//       // Wikipedia prefers a descriptive UA
-//       'User-Agent': 'YourAppName/1.0 (contact@example.com)',
-//       'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-//     },
-//   });
-
-//   const rawType = String(resp.headers['content-type'] || 'image/jpeg').toLowerCase();
-//   const mimeType = rawType.split(';')[0].trim();
-//   if (!allowedMimes.has(mimeType)) {
-//     throw new Error(`Unsupported image type from Wikipedia: ${mimeType}`);
-//   }
-
-//   const ext = this.extFromUrl(imageUrl) || this.extFromMime(mimeType) || 'jpg';
-//   const filename = `${this.sanitizeFilename(placeName || 'place')}-${Date.now()}.${ext}`;
-
-//   const { fileId } = await this.filesService.uploadFromStream(
-//     resp.data,
-//     filename,
-//     mimeType,
-//     { source: 'wikipedia', imageUrl, placeId, placeName },
-//     'avatars',
-//   );
-
-//   console.log('the field id', fileId);
-//   return {
-//     fileId,
-//     localUrl: this.buildFileUrl(fileId),
-//     mimeType,
-//     filename,
-//   };
-// }
-
 
 
 
@@ -1974,6 +1864,87 @@ private async downloadAndStoreImage(imageUrl: string, placeId?: string, placeNam
     localUrl: this.buildFileUrl(fileId),
     mimeType,
     filename,
+  };
+}
+
+
+
+private async downloadAndStoreImageWithThumbnail(
+  imageUrl: string,
+  placeId?: string,
+  placeName?: string,
+) {
+  const allowedMimes = new Set([
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/gif',
+    'image/heic',
+    'image/heif',
+    'image/svg+xml',
+    'image/bmp',
+  ]);
+
+  // 1) Download ORIGINAL once as a buffer
+  const resp = await axios.get(imageUrl, {
+    responseType: 'arraybuffer',      // buffer, not stream (we need it twice)
+    timeout: 20000,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    validateStatus: (s) => s >= 200 && s < 400,
+    headers: {
+      'User-Agent': this.WIKI_UA,
+      'Accept': 'image/*,*/*;q=0.8',
+    },
+  });
+
+  const rawType = String(resp.headers['content-type'] || 'image/jpeg').toLowerCase();
+  const mimeType = rawType.split(';')[0].trim();
+  if (!allowedMimes.has(mimeType)) {
+    throw new Error(`Unsupported image type from Wikipedia: ${mimeType}`);
+  }
+
+  const originalBuffer = Buffer.from(resp.data);
+  const ext = this.extFromUrl(imageUrl) || this.extFromMime(mimeType) || 'jpg';
+  const baseName = `${this.sanitizeFilename(placeName || 'place')}-${Date.now()}`;
+
+  // 2) Upload ORIGINAL
+  const originalFilename = `${baseName}.${ext}`;
+  const { fileId: originalId } = await this.filesService.uploadFromStream(
+    Readable.from(originalBuffer),
+    originalFilename,
+    mimeType,
+    { source: 'wikipedia', variant: 'original', imageUrl, placeId, placeName },
+    'avatars',
+  );
+  const originalUrl = this.buildFileUrl(originalId);
+
+  // 3) Create SMALLER THUMBNAIL from the same buffer
+  //    Adjust width / quality as you like (this is where you "downgrade").
+const thumbBuffer = await sharp(originalBuffer)
+  .resize({ width: 512 })
+  .jpeg({ quality: 70 })
+  .toBuffer();
+  const thumbFilename = `${baseName}-thumb.jpg`;
+  const { fileId: thumbId } = await this.filesService.uploadFromStream(
+    Readable.from(thumbBuffer),
+    thumbFilename,
+    'image/jpeg',
+    {
+      source: 'wikipedia',
+      variant: 'thumbnail',
+      imageUrl,
+      placeId,
+      placeName,
+      originalFileId: originalId,
+    },
+    'avatars',
+  );
+  const thumbnailUrl = this.buildFileUrl(thumbId);
+
+  return {
+    originalUrl,
+    thumbnailUrl,
   };
 }
 
@@ -2044,116 +2015,58 @@ async upsertPlaceFromDetail(detail: any, placeName: string) {
     .findOne(filter)
     .select('_id title images coordinates wikidata')
     .lean<PlaceLeanMinimal | null>();
- console.log("the existing", existing)
-  // Remote URLs from payload
-  // const remoteOriginalUrl: string | undefined =
-  //   detail?.images?.original || this.extractImageUrl(detail);
-  // const remoteThumbUrl: string | undefined = detail?.images?.thumbnail;
 
+  console.log('the existing', existing);
 
-
-
-  
-
-
+  // Remote URLs from payload (remote Wikipedia URLs)
   const remoteOriginalUrl: string | undefined =
-  this.pickHttpUrl(detail?.images?.original) || this.extractImageUrl(detail);
+    this.pickHttpUrl(detail?.images?.original) || this.extractImageUrl(detail);
 
-const remoteThumbUrl: string | undefined =
-  this.pickHttpUrl(detail?.images?.thumbnail) || this.pickHttpUrl(detail?.thumbnail);
+  const remoteThumbUrl: string | undefined =
+    this.pickHttpUrl(detail?.images?.thumbnail) || this.pickHttpUrl(detail?.thumbnail);
 
-
-
-
-
-
-
-
-
-
-  console.log("the detail", detail)
-  console.log("the remoteOriginalUrl", remoteOriginalUrl)
+  console.log('the detail', detail);
+  console.log('the remoteOriginalUrl', remoteOriginalUrl);
 
   let localOriginalUrl: string | undefined = existing?.images?.local_original;
   let localThumbnailUrl: string | undefined = existing?.images?.local_thumbnail;
-  // console.log("the existing", existing)
-  console.log("the localOriginalUrl", localOriginalUrl,"ffffffffff", localThumbnailUrl)
+  console.log('the localOriginalUrl', localOriginalUrl, 'ffffffffff', localThumbnailUrl);
 
   const existingId = existing?._id ? String(existing._id) : undefined;
 
-  // Save local original
-  if (remoteOriginalUrl && this.isHttpUrl(remoteOriginalUrl)) {
-    const needsNewOriginal =
-      existing?.images?.original !== remoteOriginalUrl ||
-      !existing?.images?.local_original;
+  // === Only download ONE real image: the ORIGINAL ===
+  // Never download the /thumb/ URL, only the /commons/... original.
+// === Only download ORIGINAL once, then create a smaller local thumbnail ===
+const sourceForLocal: string | undefined =
+  this.isHttpUrl(remoteOriginalUrl) ? remoteOriginalUrl : undefined;
 
-    if (needsNewOriginal) {
-       console.log("the needsNewOriginal", needsNewOriginal)
-      try {
-        const uploaded = await this.downloadAndStoreImage(
-          remoteOriginalUrl,
-          existingId,
-          placeName,
-        );
-        localOriginalUrl = uploaded.localUrl;
-        console.log("the localOriginalUrl", localOriginalUrl)
-      } catch (e: any) {
-        console.warn('[upsert] Local original save failed:', e?.message || e);
-      }
+if (sourceForLocal) {
+  const needsNewLocal =
+    existing?.images?.original !== remoteOriginalUrl ||
+    !existing?.images?.local_original ||
+    !existing?.images?.local_thumbnail;
+
+  if (needsNewLocal) {
+    console.log('[upsert] downloading & resizing image from', sourceForLocal);
+    try {
+      const uploaded = await this.downloadAndStoreImageWithThumbnail(
+        sourceForLocal,
+        existingId,
+        placeName,
+      );
+      localOriginalUrl = uploaded.originalUrl;
+      localThumbnailUrl = uploaded.thumbnailUrl;
+      console.log('[upsert] saved local original', uploaded.originalUrl);
+      console.log('[upsert] saved local thumbnail', uploaded.thumbnailUrl);
+    } catch (e: any) {
+      console.warn('[upsert] Local image+thumb save failed:', e?.message || e);
     }
   }
+}
 
-  // Save local thumbnail
-  if (remoteThumbUrl && this.isHttpUrl(remoteThumbUrl)) {
-    if (remoteOriginalUrl && remoteThumbUrl === remoteOriginalUrl) {
-      // If thumb is same as original, reuse local_original
-      if (localOriginalUrl) {
-        localThumbnailUrl = localOriginalUrl;
-      } else if (
-        existing?.images?.original === remoteOriginalUrl &&
-        existing?.images?.local_original
-      ) {
-        localThumbnailUrl = existing.images.local_original;
-      } else {
-        // Fallback: upload once and reuse for both
-        try {
-          const uploaded = await this.downloadAndStoreImage(
-            remoteThumbUrl,
-            existingId,
-            placeName,
-          );
-          
-          localOriginalUrl = uploaded.localUrl;
-          localThumbnailUrl = uploaded.localUrl;
-          console.log("the localThumbnailUrl 33", localThumbnailUrl)
-        } catch (e: any) {
-          console.warn('[upsert] Local thumb(original) save failed:', e?.message || e);
-        }
-      }
-    } else {
-      // Separate thumbnail
-      const needsNewThumb =
-        existing?.images?.thumbnail !== remoteThumbUrl ||
-        !existing?.images?.local_thumbnail;
 
-      if (needsNewThumb) {
-        console.log("the needsNewThumb", needsNewThumb)
-        try {
-          const uploaded = await this.downloadAndStoreImage(
-            remoteThumbUrl,
-            existingId,
-            placeName,
-          );
-          localThumbnailUrl = uploaded.localUrl;
-          console.log("the localThumbnailUrl", localThumbnailUrl)
-        } catch (e: any) {
-          console.warn('[upsert] Local thumbnail save failed:', e?.message || e);
-        }
-      }
-    }
-  }
 
-  // Coordinates (GeoJSON [lon, lat]) using helpers
+  // === Coordinates (GeoJSON [lon, lat]) ===
   const latRaw =
     detail?.coordinates?.lat ??
     detail?.coordinates?.latitude ??
@@ -2178,21 +2091,21 @@ const remoteThumbUrl: string | undefined =
 
   const instanceOf = toArray(wd.instance_of ?? wd.instanceOf);
   const countries = toArray(wd.countries);
-  const administrativeAreas = toArray(wd.administrative_areas ?? wd.administrativeAreas);
+  const administrativeAreas = toArray(
+    wd.administrative_areas ?? wd.administrativeAreas,
+  );
   const ranges = toArray(wd.ranges);
   const architects = toArray(wd.architects);
   const height_m = wd.height_m; // keep as-is (number or undefined)
 
-  // Build images object for DB
+  // === Build images object for DB ===
   const images: Record<string, any> = {};
   if (remoteOriginalUrl) images.original = remoteOriginalUrl;
   if (remoteThumbUrl) images.thumbnail = remoteThumbUrl;
   if (localOriginalUrl) images.local_original = localOriginalUrl;
   if (localThumbnailUrl) images.local_thumbnail = localThumbnailUrl;
 
-  
-
-  // Build update (do NOT $set title; only set on insert)
+  // === Build update (do NOT $set title; only set on insert) ===
   const $set: Record<string, any> = {
     description_short: detail?.description_short,
     description_html: detail?.description_html,
@@ -2236,19 +2149,24 @@ const remoteThumbUrl: string | undefined =
   } as const;
 
   try {
-    const response = await this.placeModel.findOneAndUpdate(filter, update, opts).lean() as PlaceResponse ;
+    const response = await this.placeModel
+      .findOneAndUpdate(filter, update, opts)
+      .lean() as PlaceResponse;
 
+    console.log('the response', response);
 
-    console.log("the response", response)
-
-
-const filteredDetail = {
-      id :  response?._id,
+    const filteredDetail = {
+      id: response?._id,
       title: response?.title,
-         wikipediaThumbImage:response?.images?.thumbnail,
-      wikipediaOriginalImage:response?.images?.original,
+
+      // Remote Wikipedia URLs
+      wikipediaThumbImage: response?.images?.thumbnail,
+      wikipediaOriginalImage: response?.images?.original,
+
+      // Your local URLs (both from the same local file)
       thumbnailImage: response?.images?.local_thumbnail,
       originalImage: response?.images?.local_original,
+
       description: response?.description_long,
       countries: response?.wikidata?.countries?.[0],
       administrativeAreas: response?.wikidata?.administrativeAreas?.[0],
@@ -2259,12 +2177,11 @@ const filteredDetail = {
       height: response?.wikidata?.height_m,
     };
 
-
-    return filteredDetail
+    return filteredDetail;
   } catch (e: any) {
     // In case of race with unique qid, retry
     if (e?.code === 11000 && qid) {
-      return await this.placeModel.findOneAndUpdate({ 'wikidata.qid': qid }, update, opts);
+      return await this.placeModel.findOneAndUpdate(filter, update, opts);
     }
     throw e;
   }
