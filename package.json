@@ -53,6 +53,7 @@
     "reflect-metadata": "0.1.13",
     "rimraf": "5.0.1",
     "rxjs": "7.8.1",
+    "sharp": "^0.34.5",
     "string-similarity": "^4.0.4",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
