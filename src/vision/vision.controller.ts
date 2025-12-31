@@ -91,7 +91,7 @@ async recognize(
       buf = Buffer.from(get('image_base64') as string, 'base64');
     } else if (get('image_url')) {
       const url = get('image_url') as string;
-      const resp = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer', timeout: 15000 });
+      const resp = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer', timeout: 35000 });
       buf = Buffer.from(resp.data as any);
     }
 
@@ -314,12 +314,24 @@ async getDataFromWikipedia(
             const getScansSummary = await this.visionService.getScansSummary(response.scanAreas)
 
 
-            console.log("the get scans Summary is", getScansSummary)
+            // console.log("the get scans Summary is", getScansSummary)
+
+            
+    const userId = req.user.sub;
+    const user = await this.userService.findOne(userId);
+
+    const translated = await this.translationService.translate(
+      getScansSummary.scans,
+      user.languageCode,
+    );
+
+
+console.log("the translated", translated)
 
                 return res.status(200).json({
       status: 200,
       message: getScansSummary.message,
-      data: getScansSummary.scans,
+      data: translated,
     });
 
           }
@@ -353,7 +365,7 @@ async getSingleScans(@Param('id') id: string, @Req() req, @Res() res: Response) 
     const userId = req.user.sub;
     const user = await this.userService.findOne(userId);
 
-    const translated = await this.translationService.translateData(
+    const translated = await this.translationService.translate(
       getScanDetail.scanDetail,
       user.languageCode,
     );
@@ -392,6 +404,344 @@ async getSingleScans(@Param('id') id: string, @Req() req, @Res() res: Response) 
     });
   }
 
+
+
+
+
+
+
+
+@Post('lens')
+@UseGuards(AuthGuard)
+@UseFilters(new HttpExceptionFilter())
+@UseInterceptors(
+  FileFieldsInterceptor(
+    [
+      { name: 'image', maxCount: 1 },
+      { name: 'file',  maxCount: 1 },
+    ],
+    {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    },
+  ),
+)
+async recognizeWithLenss(
+  @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
+  @Body() body: RecognizeDto,
+  @Query() query: RecognizeDto,
+  @Req() req,
+  @Res() res: Response,
+) {
+  const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
+  const userId = req.user?.sub;
+
+  console.log('the body', body);
+
+  // --- parse user location from frontend: lat, lon ---
+  const latRaw = get('lat');
+  const lonRaw = get('lon');
+
+  const userLat =
+    latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
+  const userLon =
+    lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
+
+  //  const userLat = 40.743474550126685;
+  // const userLon = -73.97498397090854;
+
+  if (
+    (latRaw !== undefined && Number.isNaN(userLat)) ||
+    (lonRaw !== undefined && Number.isNaN(userLon))
+  ) {
+    throw new BadRequestException('Invalid lat or lon');
+  }
+
+  // 1) Build image buffer
+  let buf: Buffer | undefined;
+  const up = files?.image?.[0] ?? files?.file?.[0];
+
+  if (up?.buffer) {
+    buf = up.buffer;
+  } else if (get('image_base64')) {
+    buf = Buffer.from(get('image_base64') as string, 'base64');
+  } else if (get('image_url')) {
+    const url = get('image_url') as string;
+    const resp = await axios.get<ArrayBuffer>(url, {
+      responseType: 'arraybuffer',
+      timeout: 35000,
+    });
+    buf = Buffer.from(resp.data as any);
+  }
+
+  if (!buf) {
+    throw new BadRequestException(
+      "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
+    );
+  }
+
+  try {
+    // 2) Google Lens via SerpApi
+    const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
+
+    if (lensResult.lowConfidence || !lensResult.first) {
+      return res.status(400).json({
+        status: 400,
+        message: 'LOW_CONFIDENCE',
+        data:
+          'Please try again and take a clearer photo from a different angle.',
+      });
+    }
+
+    const first = lensResult.first;
+
+    // 3) Derive canonical place name
+    const placeName: string =
+      lensResult.label ||
+      lensResult.raw?.knowledge_graph?.title ||
+      lensResult.raw?.knowledge_graph?.name ||
+      lensResult.raw?.related_content?.[0]?.query ||
+      first.title ||
+      first.name ||
+      first.link_title ||
+      first.query ||
+      'Unknown building';
+
+    // 4) Existing place in DB? -> check area, then return
+    const existing = await this.visionService.findPlaceDetailSerp(placeName);
+    if (existing) {
+      // existing is a flattened DTO, so latitude/longitude likely live in aiLatitude/aiLongitude
+      const existingAny = existing as any;
+
+      const existingLat =
+        existingAny.aiLatitude ??
+        existingAny.latitude ??
+        existingAny.ai?.latitude ??
+        existingAny.coordinates?.coordinates?.[1];
+
+      const existingLon =
+        existingAny.aiLongitude ??
+        existingAny.longitude ??
+        existingAny.ai?.longitude ??
+        existingAny.coordinates?.coordinates?.[0];
+
+      if (
+        userLat != null &&
+        userLon != null &&
+        existingLat != null &&
+        existingLon != null
+      ) {
+        const distKm = this.visionService.distanceKm(
+          userLat,
+          userLon,
+          Number(existingLat),
+          Number(existingLon),
+        );
+
+        const MAX_DISTANCE_KM = 50; // tune as needed
+
+        if (distKm > MAX_DISTANCE_KM) {
+          return res.status(400).json({
+            status: 400,
+            message: 'LOCATION_MISMATCH',
+            data:
+              'You are out of zone. Please come in 50KM radius',
+          });
+        }
+      }
+
+      await this.userService.addScanIdInUser(userId, existing.id);
+      return res.status(200).json({
+        status: 200,
+        message: 'success',
+        data: existing,
+      });
+    }
+
+    // 5) No existing place -> call ChatGPT
+    const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+    console.log('the gpt data', gpt);
+
+    // 6) Area restriction vs GPT coordinates
+    if (
+      userLat != null &&
+      userLon != null &&
+      gpt?.latitude != null &&
+      gpt?.longitude != null
+    ) {
+      const distKm = this.visionService.distanceKm(
+        userLat,
+        userLon,
+        Number(gpt.latitude),
+        Number(gpt.longitude),
+      );
+
+      const MAX_DISTANCE_KM = 50; // tune as needed
+
+      if (distKm > MAX_DISTANCE_KM) {
+        return res.status(400).json({
+          status: 400,
+          message: 'LOCATION_MISMATCH',
+          data:
+           'You are out of zone. Please come in 50KM radius',
+        });
+      }
+    }
+
+    // 7) Upsert place in DB
+    const placeDoc = await this.visionService.upsertPlaceFromLens({
+      first,
+      imageUrl: lensResult.imageUrl,
+      gpt,
+    });
+
+    // 8) Attach place id to user
+    await this.userService.addScanIdInUser(userId, String(placeDoc._id));
+
+    // 9) Response: use AI title as main title
+    const displayTitle = placeDoc.ai?.title || placeDoc.title;
+
+    const responseData = {
+      id: placeDoc._id,
+      title: displayTitle,                     // AI title for frontend
+      thumbnailImage: placeDoc.images?.thumbnail,
+      originalImage: placeDoc.images?.original,
+      chatgptTitle: placeDoc.ai?.title,
+      shortDescription: placeDoc.ai?.shortDescription,
+      tourismDescription: placeDoc.ai?.tourismDescription,
+      funFacts: placeDoc.ai?.funFacts,
+      heightMeters: placeDoc.ai?.heightMeters,
+      latitude: placeDoc.ai?.latitude,
+      longitude: placeDoc.ai?.longitude,
+      architectureStyle: placeDoc.ai?.architectureStyle,
+        architectName: placeDoc.ai?.architectName,  // <-- NEW
+  location: placeDoc.ai?.location, 
+    };
+
+    console.log('the response', responseData);
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: responseData,
+    });
+  } catch (e: any) {
+    console.error('[Lens] error:', e?.message || e);
+    return res.status(400).json({
+      status: 400,
+      message: 'FAILURE',
+      data: e?.message || 'Google Lens lookup failed',
+    });
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+@UseGuards(AuthGuard)
+@Get('get-scan-serp/:id')
+async getSingleScanSerp(
+  @Param('id') id: string,
+  @Req() req,
+  @Res() res: Response,
+) {
+  try {
+    // 1) Get SERP/Lens scan detail by id
+    const getScanDetail = await this.visionService.getScansDetailsSerp(id);
+
+    if (getScanDetail.status !== 200) {
+      return res.status(400).json({
+        status: getScanDetail.status,
+        message: getScanDetail.message,
+        data: getScanDetail.error,
+      });
+    }
+
+    // 2) Get user language
+    const userId = req.user.sub;
+    const user = await this.userService.findOne(userId);
+
+    // 3) Translate the serp scan detail to user.languageCode (if needed)
+    const translated = await this.translationService.translate(
+      getScanDetail.scanDetail,   // place detail (with ai fields)
+      user.languageCode,
+    );
+
+    // 4) Return translated serp scan detail
+    return res.status(200).json({
+      status: getScanDetail.status,
+      message: getScanDetail.message,
+      data: translated,
+    });
+  } catch (error) {
+    console.error('Error in getSingleScanSerp:', error);
+
+    return res.status(502).json({
+      status: 502,
+      message: 'Failed to translate serp scan detail',
+    });
+  }
+}
+
+
+
+
+@ApiOperation({
+  summary: 'fetch (Serp)',
+  description: 'Get scan summary of specific user (Serp version)',
+})
+@ApiResponse({
+  status: 200,
+  description: 'Get scan summary of specific user successfully',
+})
+@ApiResponse({ status: 403, description: 'Forbidden.' })
+@UseGuards(AuthGuard)
+@Get('get-scans-serp')
+@UseFilters(new HttpExceptionFilter())
+async getScansSerp(@Req() req, @Res() res: Response): Promise<any> {
+  const userId = req.user.sub;
+  console.log('the user is in getScansSerp', userId);
+
+  const response = await this.userService.getScansId(userId);
+  console.log('the response in getScansSerp', response);
+
+  if (response.status === 200) {
+    // New summary method
+    const getScansSummary = await this.visionService.getScansSummarySerp(
+      response.scanAreas,
+    );
+
+    const user = await this.userService.findOne(userId);
+
+    const translated = await this.translationService.translate(
+      getScansSummary.scans,
+      user.languageCode,
+    );
+
+    console.log('the translated (Serp)', translated);
+
+    return res.status(200).json({
+      status: 200,
+      message: getScansSummary.message,
+      data: translated,
+    });
+  }
+
+  return res.status(400).json({
+    status: 400,
+    message: 'failed',
+    data: 'error in getting the scan details',
+  });
+}
 
 
 }

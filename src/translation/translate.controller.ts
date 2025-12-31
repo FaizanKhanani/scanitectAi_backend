@@ -38,7 +38,7 @@ export class TranslateController {
     const { data, targetLang } = body;
 
     console.log("the targetLang", targetLang, "the data",data)
-    const translated = await this.translationService.translateData(data, targetLang);
+    const translated = await this.translationService.translate(data, targetLang);
     console.log("the translated",translated )
     return { data: translated };
   }

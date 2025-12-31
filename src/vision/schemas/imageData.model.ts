@@ -1,3 +1,7 @@
+
+
+
+
 // // src/schemas/place.schema.ts
 // import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 // import { Document, SchemaTypes } from 'mongoose';
@@ -14,9 +18,24 @@
 // }
 
 // @Schema({ _id: false })
+// class ImageItem {
+//   @Prop() title?: string;
+//   @Prop() original?: string;
+//   @Prop() thumbnail?: string;
+//   @Prop() localOriginal?: string;
+//   @Prop() localThumbnail?: string;
+// }
+
+// @Schema({ _id: false })
 // class Images {
 //   @Prop() thumbnail?: string;
 //   @Prop() original?: string;
+//   @Prop() localThumbnail?: string;
+//   @Prop() localOriginal?: string;
+
+//   // Multiple images (at least 5–6) will be saved here
+//   @Prop({ type: [ImageItem], default: [] })
+//   gallery?: ImageItem[];
 // }
 
 // @Schema({ _id: false })
@@ -63,6 +82,12 @@
 
 
 
+
+
+
+
+
+
 // src/schemas/place.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes } from 'mongoose';
@@ -94,7 +119,6 @@ class Images {
   @Prop() localThumbnail?: string;
   @Prop() localOriginal?: string;
 
-  // Multiple images (at least 5–6) will be saved here
   @Prop({ type: [ImageItem], default: [] })
   gallery?: ImageItem[];
 }
@@ -114,6 +138,18 @@ class WikidataSubdoc {
   @Prop({ type: GeoPoint, required: false }) coordinates?: GeoPoint;
 }
 
+// NEW: AI / ChatGPT info subdocument
+@Schema({ _id: false })
+class AiInfo {
+  @Prop() title?: string;                 // NEW: title/name from ChatGPT
+  @Prop() shortDescription?: string;      // from ChatGPT
+  @Prop() tourismDescription?: string;    // from ChatGPT
+  @Prop([String]) funFacts?: string[];    // from ChatGPT
+  @Prop() heightMeters?: number;          // from ChatGPT
+  @Prop() latitude?: number;              // from ChatGPT
+  @Prop() longitude?: number;             // from ChatGPT
+  @Prop() architectureStyle?: string;     // from ChatGPT
+}
 @Schema({ timestamps: true })
 export class Place {
   @Prop({ required: true }) title: string;
@@ -127,6 +163,9 @@ export class Place {
   @Prop({ type: GeoPoint, required: false }) coordinates?: GeoPoint;
 
   @Prop({ type: WikidataSubdoc, default: {} }) wikidata?: WikidataSubdoc;
+
+  // NEW: AI-generated info (ChatGPT)
+  @Prop({ type: AiInfo, default: {} }) ai?: AiInfo;
 
   // optional: keep raw API payload for debugging
   @Prop({ type: SchemaTypes.Mixed }) raw?: any;

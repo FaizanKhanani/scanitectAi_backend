@@ -15,6 +15,7 @@ import { firstValueFrom } from 'rxjs';
 import similarity from "string-similarity";
 import * as sharp from 'sharp';
 import { Readable } from 'stream';
+import * as NodeFormData from 'form-data'; 
 
 interface WikipediaResult {
   status: number;
@@ -87,7 +88,22 @@ type Candidate = LandmarkOut & { finalScore: number };
 //     coordinates?: number[];
 //   };
 // }
+interface AiInfoResponse {
+  title?: string;               // ChatGPT building title
+  shortDescription?: string;    // GPT short description
+  tourismDescription?: string;  // GPT tourism-focused description
+  funFacts?: string[];          // GPT fun facts
+  heightMeters?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  architectureStyle?: string | null;
+   architectName: String,   // <-- add
+  location: String,   
+}
 
+interface PlaceResponseSerp extends PlaceResponse {
+  ai?: AiInfoResponse;
+}
 
 interface PlaceResponse {
 _id?: any;
@@ -141,6 +157,21 @@ interface GeoResult {
   lat: number;
   lon: number;
 }
+
+
+interface ChatGptBuildingInfo {
+  name: string;
+  shortDescription: string;
+  tourismDescription: string;
+  funFacts: string[];
+  heightMeters: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  architectureStyle: string | null;
+     architectName: String,   // <-- add
+  location: String,   
+}
+
 
 
 
@@ -1740,10 +1771,30 @@ async getDetail(
 
 
 
-  private buildFileUrl(fileId: string) {
-    const base = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
-    return `${base}/files/${fileId}`;
+  // private buildFileUrl(fileId: string) {
+  //   const base = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
+  //   return `${base}/files/${fileId}`;
+  // }
+
+    private buildFileUrl(fileId: string) {
+const base = (process.env.APP_URL ?? 'https://scanitectai.com/api').replace(/\/+$/, '');
+return `${base}/files/${fileId}`;
   }
+
+
+// private buildFileUrl(fileId: string, filename?: string) {
+//   const base = (process.env.APP_URL ?? 'https://scanitectai.com/api').replace(/\/+$/, '');
+
+//   // Try to take extension from filename: "xxx.jpg" -> "jpg"
+//   const match = filename?.match(/\.([a-z0-9]+)$/i);
+//   const ext = match?.[1];
+
+//   return ext
+//     ? `${base}/files/${fileId}.${ext}`   // e.g. /files/<id>.jpg
+//     : `${base}/files/${fileId}`;         // fallback if no ext
+// }
+
+
 
   private extFromMime(m: string) {
     const mm = (m || '').toLowerCase();
@@ -2671,6 +2722,851 @@ async searchTitle(label: string): Promise<WikipediaResult> {
 //   console.log("the best", bestTitle)
 //   return bestTitle;
 // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Upload user image and get a public URL (used for Google Lens)
+// private async uploadLensImageAndGetUrl(
+//   buf: Buffer,
+//   userId?: string,
+// ): Promise<string> {
+//   const filename = `lens-${Date.now()}.jpg`;
+
+//   try {
+//     const { fileId } = await this.filesService.uploadFromBuffer(
+//       buf,                     // <--- use the raw buffer from request
+//       filename,
+//       'image/jpeg',            // you can detect real mime later
+//       { source: 'google_lens', userId },
+//       'avatars',               // IMPORTANT: same bucket as your working images
+//     );
+
+//     const url = this.buildFileUrl(fileId);
+//     console.log('[Lens] Stored file in GridFS', { fileId, url });
+//     return url;
+//   } catch (e: any) {
+//     console.error('[Lens] uploadFromBuffer FAILED:', e?.message || e);
+//     throw e;
+//   }
+// }
+  // --- NEW: call SerpApi Google Lens and return first visual match ---
+
+
+
+
+
+// async recognizeWithGoogleLens(
+//   buf: Buffer,
+//   userId?: string,
+// ): Promise<{ first: any; raw: any }> {
+//   const apiKey = process.env.SERPAPI_KEY;
+//   if (!apiKey) {
+//     throw new Error('SERPAPI_KEY is not configured');
+//   }
+
+//   // 1) Store the image in GridFS and get a public URL
+//   const publicUrl = await this.uploadLensImageAndGetUrl(buf, userId);
+//   console.log('[Lens] public image url for SerpApi:', publicUrl);
+
+//   // 2) Call SerpApi Google Lens with that URL
+//   const resp = await axios.get('https://serpapi.com/search.json', {
+//     params: {
+//       engine: 'google_lens',
+//       url: publicUrl,
+//       api_key: apiKey,
+//     },
+//     timeout: 20000,
+//   });
+
+//   const data = resp.data;
+
+//   // 3) Take the first result object
+//   const first =
+//     data?.visual_matches?.[0] ??
+//     data?.image_results?.[0] ??
+//     null;
+
+//   return { first, raw: data };
+// }
+
+
+
+
+  // async recognizeWithGoogleLens(
+  //   buf: Buffer,
+  //   userId?: string,
+  // ): Promise<{ first: any; raw: any }> {
+  //   const apiKey =
+  //     process.env.SERPAPI_KEY;
+
+  //   if (!apiKey) {
+  //     throw new Error('SERPAPI_KEY is not configured');
+  //   }
+
+  //   // 1) Upload the image so SerpApi/Google Lens can access it
+  //   const publicUrl = await this.uploadImageAndGetPublicUrl(buf, userId);
+  //   console.log('[Lens] public image url:', publicUrl);
+
+  //   // 2) Call SerpApi Google Lens
+  //   const resp = await axios.get('https://serpapi.com/search.json', {
+  //     params: {
+  //       engine: 'google_lens',
+  //       url: publicUrl,
+  //       api_key: apiKey,
+  //     },
+  //     timeout: 20000,
+  //   });
+
+  //   const data = resp.data;
+
+  //   // 3) "First object": usually from visual_matches[0]
+  //   const first =
+  //     data?.visual_matches?.[0] ??
+  //     data?.image_results?.[0] ??
+  //     null;
+
+  //   return { first, raw: data };
+  // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ private readonly wpBaseUrl ='https://ladiesinnersense.com/';
+  private readonly wpUser = 'admin';
+  private readonly wpAppPassword =  'NoAC 8Qs7 UBTX hPAK 3ezz 8p38';
+
+
+
+  private scoreVisualMatch(m: any, label?: string | null): number {
+    let score = 0;
+
+    const titleRaw = m.title || m.name || m.link_title || '';
+    const title = titleRaw.toLowerCase();
+    const link = m.link || '';
+
+    let host = '';
+    try {
+      host = new URL(link).hostname.toLowerCase(); // Node's global URL
+    } catch {
+      host = '';
+    }
+
+    const goodDomains = [
+      'cityrealty.com',
+      'wikipedia.org',
+      'skyscrapercenter.com',
+      'newyorkyimby.com',
+      'headout.com',
+      'tripadvisor.com',
+      'atlasobscura.com',
+      'nyc.gov',
+    ];
+
+    const badDomains = [
+      'shutterstock.com',
+      'istockphoto.com',
+      'dreamstime.com',
+      'alamy.com',
+      'pexels.com',
+      'unsplash.com',
+      'facebook.com',
+      'instagram.com',
+      'pinterest.com',
+      'flickr.com',
+    ];
+
+    if (goodDomains.some((d) => host.endsWith(d))) score += 8;
+    if (badDomains.some((d) => host.endsWith(d))) score -= 5;
+
+    if (
+      /\b(condo|apartments?|residence|tower|building|skyscraper|street|st\.?|avenue|ave\.?|boulevard|blvd\.?|plaza|block)\b/.test(
+        title,
+      )
+    ) {
+      score += 4;
+    }
+
+    if (/\b\d+\s+\w+(\s+(street|st|avenue|ave|road|rd|boulevard|blvd|place|plaza))?\b/i.test(titleRaw)) {
+      score += 4;
+    }
+
+    if (label) {
+      const l = label.toLowerCase();
+      if (title.includes(l)) {
+        score += 20;
+      } else {
+        const lWords = l.split(/\s+/).filter((w) => w.length > 3);
+        const tWords = new Set(title.split(/[^\w]+/));
+        const overlap = lWords.filter((w) => tWords.has(w)).length;
+        score += overlap * 3;
+      }
+    }
+
+    if (typeof m.position === 'number') {
+      const posBonus = Math.max(-3, 3 - (m.position - 1) * 0.2);
+      score += posBonus;
+    }
+
+    return score;
+  }
+
+
+
+
+ async uploadMediaFromBuffer(
+    buf: Buffer,
+    filename = 'image.jpg',
+    mimeType = 'image/jpeg',
+  ): Promise<string> {
+    // use the alias, not the global FormData
+    const form = new NodeFormData();
+
+    form.append('file', buf, {
+      filename,
+      contentType: mimeType,
+    });
+
+    const authToken = Buffer.from(
+      `${this.wpUser}:${this.wpAppPassword}`,
+    ).toString('base64');
+
+    try {
+      const { data } = await axios.post(
+        `${this.wpBaseUrl}/wp-json/wp/v2/media`,
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),           // now exists
+            Authorization: `Basic ${authToken}`,
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+        },
+      );
+
+      if (!data?.source_url) {
+        throw new InternalServerErrorException(
+          'WordPress did not return a media URL',
+        );
+      }
+
+      return data.source_url as string;
+    } catch (err: any) {
+      console.error(
+        '[WordpressService] upload error:',
+        err?.response?.data || err?.message || err,
+      );
+      throw new InternalServerErrorException(
+        err?.message || 'Failed to upload image to WordPress',
+      );
+    }
+  }
+
+
+  
+
+
+
+// ChatGPT / OpenAI config
+
+
+async recognizeWithGoogleLens(
+  buf: Buffer,
+): Promise<{
+  first: any;
+  raw: any;
+  imageUrl: string;
+  label: string | null;
+  lowConfidence: boolean;
+}> {
+  const apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey) throw new Error('SERPAPI_KEY is not configured');
+
+  const filename = `lens-${Date.now()}.jpg`;
+  const mimeType = 'image/jpeg';
+  const imageUrl = await this.uploadMediaFromBuffer(buf, filename, mimeType);
+
+  const { data } = await axios.get('https://serpapi.com/search.json', {
+    params: { engine: 'google_lens', url: imageUrl, api_key: apiKey },
+    timeout: 50000,
+  });
+
+  console.log("the data", data)
+
+  const visualMatches: any[] =
+    data?.visual_matches ??
+    data?.image_results ??
+    [];
+
+  const hasKg = !!data?.knowledge_graph;
+  const hasRelated =
+    Array.isArray(data?.related_content) &&
+    data.related_content.length > 0;
+
+  // If Google didn’t produce KG or related content, we treat as low confidence
+  const lowConfidence = !hasKg && !hasRelated;
+
+  // Label only from KG / related_content (not from visual_matches)
+  const kgTitle =
+    data?.knowledge_graph?.title ||
+    data?.knowledge_graph?.name ||
+    null;
+
+  const relatedQuery =
+    data?.related_content?.[0]?.query ||
+    null;
+
+  const label: string | null = kgTitle || relatedQuery || null;
+
+  // Use your scoring logic here (shortened for brevity)
+  let first: any = null;
+  if (visualMatches.length > 0) {
+    const candidates = visualMatches.slice(0, 40);
+    candidates.sort(
+      (a, b) =>
+        this.scoreVisualMatch(b, label) - this.scoreVisualMatch(a, label),
+    );
+    first = candidates[0];
+  }
+
+  return { first, raw: data, imageUrl, label, lowConfidence };
+}
+
+
+async upsertPlaceFromLens(
+  lensResult: {
+    first: any;
+    imageUrl: string;
+    gpt: ChatGptBuildingInfo | null;
+  },
+) {
+  const { first, imageUrl, gpt } = lensResult;
+
+  const title: string =
+    first?.title ||
+    first?.name ||
+    first?.link_title ||
+    first?.query ||
+    'Unknown building';
+
+  const lensThumbnail: string =
+    first?.thumbnail ||
+    first?.thumbnail_url ||
+    first?.thumbnail?.source ||
+    first?.thumbnail?.link ||
+    imageUrl;
+
+  const coordinates =
+    gpt && gpt.latitude != null && gpt.longitude != null
+      ? {
+          type: 'Point',
+          coordinates: [
+            Number(gpt.longitude),
+            Number(gpt.latitude),
+          ] as [number, number],
+        }
+      : undefined;
+
+  // include architectName + location in ai
+  const aiInfo = gpt
+    ? {
+        title: gpt.name || title,
+        shortDescription: gpt.shortDescription || '',
+        tourismDescription: gpt.tourismDescription || '',
+        funFacts: gpt.funFacts || [],
+        heightMeters: gpt.heightMeters ?? null,
+        latitude: gpt.latitude ?? null,
+        longitude: gpt.longitude ?? null,
+        architectureStyle: gpt.architectureStyle || '',
+        architectName: gpt.architectName || '', // <--
+        location: gpt.location || '',           // <--
+      }
+    : {};
+
+  const update: any = {
+    title,
+    'images.original': imageUrl,
+    'images.thumbnail': lensThumbnail,
+    descriptionShort: gpt?.shortDescription || '',
+    descriptionLong: gpt?.tourismDescription || '',
+    ai: aiInfo,
+    raw: {
+      lensFirst: first,
+      gpt,
+    },
+  };
+
+  if (coordinates) {
+    update.coordinates = coordinates;
+  }
+
+  const placeDoc = await this.placeModel.findOneAndUpdate(
+    { title },
+    { $set: update },
+    { new: true, upsert: true },
+  );
+
+  return placeDoc;
+}
+
+
+
+
+
+  public distanceKm(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const R = 6371; // Earth radius in km
+
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) ** 2;
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+
+
+
+
+
+private readonly openaiApiKey = process.env.OPENAI_API_KEY; // put your key in env
+private readonly openaiApiUrl = 'https://api.openai.com/v1/chat/completions';
+private readonly openaiModel = 'gpt-4.1-mini'; // or 'gpt-4.1', etc.
+
+
+
+
+
+
+
+
+
+public async getBuildingInfoFromChatGPT(
+  buildingName: string,
+): Promise<ChatGptBuildingInfo> {
+  if (!this.openaiApiKey) {
+    throw new InternalServerErrorException('OPENAI_API_KEY is not configured');
+  }
+
+  console.log("here reach", buildingName)
+
+  const prompt = `
+You are an expert travel writer and architectural historian.
+Given the name of a building, output ONLY a JSON object with these fields:
+
+{
+  "name": string,
+  "shortDescription": string,          // 3–5 sentences, general overview
+  "tourismDescription": string,       // 4–8 sentences, from tourist perspective
+  "funFacts": string[],               // list of short fun/interesting facts
+  "heightMeters": number | null,      // height in meters if known, else null
+  "latitude": number | null,          // decimal degrees if known, else null
+  "longitude": number | null,         // decimal degrees if known, else null
+  "architectureStyle": string | null  // e.g. "Gothic Revival"; null if unknown
+  "architectName": string | null  // e.g. "Minoru Yamasaki"; null if unknown
+  "location": string | null  // e.g. "Newyork"; null if unknown
+}
+
+Rules:
+- If a value is unknown, use null for numbers and "" for strings, [] for funFacts.
+- Do not add extra fields.
+- Do not write anything before or after the JSON.
+
+Building name: "${buildingName}"
+`.trim();
+
+  try {
+    const { data } = await axios.post(
+      this.openaiApiUrl,
+      {
+        model: this.openaiModel,
+        messages: [
+          { role: 'system', content: 'You output ONLY strict JSON, no explanation.' },
+          { role: 'user', content: prompt },
+        ],
+        // If model supports JSON mode (GPT‑4.1, GPT‑4.1‑mini, GPT‑4o, etc.)
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 50000,
+      },
+    );
+
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    const parsed = JSON.parse(content) as ChatGptBuildingInfo;
+
+    console.log("the parsed", parsed)
+
+    return parsed;
+  } catch (e: any) {
+    console.error('[ChatGPT] error:', e?.response?.data || e?.message || e);
+    throw new InternalServerErrorException(
+      e?.message || 'Failed to get building info',
+    );
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+async findPlaceDetailSerp(PlaceName: string) {
+  console.log('the place name', PlaceName);
+
+  const getDetail = await this.placeModel
+    .findOne({ title: PlaceName })
+    .lean<PlaceResponseSerp>();
+
+  console.log('the get detail is thisssssss', getDetail);
+
+  if (!getDetail) return null;
+
+  // Image fallbacks:
+  // - wikipediaThumbImage / wikipediaOriginalImage = raw images
+  // - thumbnailImage / originalImage = prefer local_*, else remote
+  const wikipediaThumbImage = getDetail.images?.thumbnail;
+  const wikipediaOriginalImage = getDetail.images?.original;
+
+  const thumbnailImage =
+    getDetail.images?.local_thumbnail ||
+    getDetail.images?.thumbnail ||
+    undefined;
+
+  const originalImage =
+    getDetail.images?.local_original ||
+    getDetail.images?.original ||
+    undefined;
+
+  // Description: prefer long wiki description, else AI tourism, else AI short
+  const description =
+    getDetail.description_long ||
+    getDetail.ai?.tourismDescription ||
+    getDetail.ai?.shortDescription ||
+    '';
+
+  const filteredDetail = {
+    id: getDetail._id,
+    title: getDetail.title,
+
+    // raw Wikipedia / Lens images
+    wikipediaThumbImage,
+    wikipediaOriginalImage,
+
+    // preferred images for UI
+    thumbnailImage,
+    originalImage,
+
+    // description
+    description,
+
+    // Wikidata fields (may be empty for Lens-only docs)
+    countries: getDetail.wikidata?.countries?.[0],
+    administrativeAreas: getDetail.wikidata?.administrativeAreas?.[0],
+    ranges: getDetail.wikidata?.ranges,
+    instanceOf: getDetail.wikidata?.instanceOf,
+    architects: getDetail.wikidata?.architects?.[0],
+    coordinates: getDetail.coordinates?.coordinates,
+    height: getDetail.wikidata?.height_m,
+
+    // ChatGPT fields (for Lens docs)
+    chatgptTitle: getDetail.ai?.title,
+    aiShortDescription: getDetail.ai?.shortDescription,
+    aiTourismDescription: getDetail.ai?.tourismDescription,
+    aiFunFacts: getDetail.ai?.funFacts,
+    aiHeightMeters: getDetail.ai?.heightMeters,
+    aiLatitude: getDetail.ai?.latitude,
+    aiLongitude: getDetail.ai?.longitude,
+    aiArchitectureStyle: getDetail.ai?.architectureStyle,
+     aiArchitectName: getDetail.ai?.architectName || '',
+      aiLocation: getDetail.ai?.location || '',
+  };
+
+  return filteredDetail;
+}
+
+
+
+// In VisionService
+async getScansDetailsSerp(id: string) {
+  try {
+    const place = await this.placeModel
+      .findById(id)
+      .lean<PlaceResponseSerp>(); // keep your type here
+
+    if (!place) {
+      return {
+        status: 404,
+        message: 'not_found',
+        error: `Scan with id ${id} not found`,
+      };
+    }
+
+    // Cast just for accessing raw.gpt (not in PlaceResponseSerp type)
+    const placeAny = place as any;
+    const gptRaw = placeAny.raw?.gpt;
+
+    const scanDetail = {
+      id: place._id,
+      title: place.title,
+
+      wikipediaThumbImage: place.images?.thumbnail,
+      wikipediaOriginalImage: place.images?.original,
+      thumbnailImage: place.images?.local_thumbnail || place.images?.thumbnail,
+      originalImage: place.images?.local_original || place.images?.original,
+
+      description:          // matches your place object
+        place.ai?.tourismDescription ||
+        place.ai?.shortDescription ||
+        '',
+
+      countries: place.wikidata?.countries?.[0],
+      administrativeAreas: place.wikidata?.administrativeAreas?.[0],
+      ranges: place.wikidata?.ranges,
+      instanceOf: place.wikidata?.instanceOf,
+      architects: place.wikidata?.architects?.[0],
+      coordinates: place.coordinates?.coordinates,
+      height: place.wikidata?.height_m,
+
+      // GPT / AI fields
+      chatgptTitle: place.ai?.title,
+      aiShortDescription: place.ai?.shortDescription,
+      aiTourismDescription: place.ai?.tourismDescription,
+      aiFunFacts: place.ai?.funFacts,
+      aiHeightMeters: place.ai?.heightMeters,
+      aiLatitude: place.ai?.latitude,
+      aiLongitude: place.ai?.longitude,
+      aiArchitectureStyle: place.ai?.architectureStyle,
+
+      // NEW: architect + location – prefer ai, fallback to raw.gpt
+      aiArchitectName:
+        place.ai?.architectName ??
+        gptRaw?.architectName ??
+        '',
+      aiLocation:
+        place.ai?.location ??
+        gptRaw?.location ??
+        '',
+    };
+
+
+    console.log("the scan detail", scanDetail)
+
+    return {
+      status: 200,
+      message: 'success',
+      scanDetail,
+    };
+  } catch (e: any) {
+    return {
+      status: 500,
+      message: 'error',
+      error: e?.message || e,
+    };
+  }
+}
+
+
+
+async getScansSummarySerp(scanIds: string[]) {
+  try {
+    const scans = await this.placeModel
+      .find({ _id: { $in: scanIds } })
+      .lean<any>();
+
+    const result = scans.map((scan) => {
+      // Thumbnail: prefer local thumbnail, then remote thumbnail, then local orig, then remote orig
+      const thumbnailImage =
+        scan.images?.local_thumbnail ||
+        scan.images?.thumbnail ||
+        scan.images?.local_original ||
+        scan.images?.original ||
+        '';
+
+      // AI title (ChatGPT title), fallback to DB title
+      const aiTitle = scan.ai?.title || scan.title || 'Unknown';
+
+      const architectureStyle = scan.ai?.architectureStyle || 'Unknown';
+
+      const location =
+        scan.ai?.location ||
+        scan.raw?.gpt?.location ||
+        'Unknown';
+
+      // date: use updatedAt, then createdAt, else empty
+      const date: string =
+        (scan.updatedAt || scan.createdAt || new Date()).toISOString();
+
+      return {
+        id: scan._id.toString(),
+        aiTitle,
+        date,
+        location,
+        architectureStyle,
+        thumbnailImage,
+      };
+    });
+
+    return {
+      status: 200,
+      message: 'Fetched scan summaries successfully',
+      scans: result,
+    };
+  } catch (error: any) {
+    console.error('Error fetching scans summary (Serp):', error);
+    return {
+      status: 500,
+      message: 'Error fetching scans summary',
+      error: error.message || String(error),
+    };
+  }
+}
+
+
+
+
+
+
+
+//   async getBuildingInfo(buildingName: string): Promise<BuildingInfo> {
+//     if (!this.apiKey) {
+//       throw new InternalServerErrorException('OPENAI_API_KEY is not configured');
+//     }
+
+//     const prompt = `
+// You are an expert travel writer and architectural historian.
+// Given the name of a building, output ONLY a JSON object with these fields:
+
+// {
+//   "name": string,
+//   "shortDescription": string,              // 1–2 sentences, general
+//   "tourismDescription": string,           // 2–4 sentences, from tourist perspective
+//   "funFacts": string[],                   // list of short fun/interesting facts
+//   "heightMeters": number | null,          // height in meters if known, else null
+//   "latitude": number | null,              // decimal degrees if known, else null
+//   "longitude": number | null,             // decimal degrees if known, else null
+//   "architectureStyle": string | null      // e.g. "Gothic Revival", or null
+// }
+
+// Rules:
+// - If a value is unknown, use null (for numbers) or "" (for strings) and empty array for funFacts.
+// - Do not add extra fields.
+// - Do not write any text before or after the JSON.
+// Building name: "${buildingName}"
+// `.trim();
+
+//     try {
+//       const { data } = await axios.post(
+//         this.apiUrl,
+//         {
+//           model: this.model,
+//           messages: [
+//             { role: 'system', content: 'You output ONLY strict JSON, no explanation.' },
+//             { role: 'user', content: prompt },
+//           ],
+//           // If your model supports JSON mode:
+//           response_format: { type: 'json_object' },
+//         },
+//         {
+//           headers: {
+//             Authorization: `Bearer ${this.apiKey}`,
+//             'Content-Type': 'application/json',
+//           },
+//           timeout: 20000,
+//         },
+//       );
+
+//       const content = data?.choices?.[0]?.message?.content;
+//       if (!content) {
+//         throw new Error('Empty response from OpenAI');
+//       }
+
+//       const parsed = JSON.parse(content) as BuildingInfo;
+//       return parsed;
+//     } catch (e: any) {
+//       console.error('[ChatGptService] error:', e?.response?.data || e?.message || e);
+//       throw new InternalServerErrorException(
+//         e?.message || 'Failed to get building info from ChatGPT',
+//       );
+//     }
+//   }
+
+
+
+
 
 
 
