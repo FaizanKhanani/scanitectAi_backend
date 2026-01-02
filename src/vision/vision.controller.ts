@@ -54,231 +54,165 @@ export class VisionController {
 
 
 
-@Post()
-@UseGuards(AuthGuard)
-@UseFilters(new HttpExceptionFilter())
-  @UseInterceptors(
-    FileFieldsInterceptor(
-      [
-        { name: 'image', maxCount: 1 },
-        { name: 'file',  maxCount: 1 },
-      ],
-      {
-        storage: memoryStorage(),
-        limits: { fileSize: 10 * 1024 * 1024 },
-      },
-    ),
-  )
-async recognize(
-  @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
-  @Body() body: RecognizeDto,
-  @Query() query: RecognizeDto,
-  @Req() req,
-  @Res() res: Response,
-) {
-  const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
-  const userId = req.user.sub;
+// @Post()
+// @UseGuards(AuthGuard)
+// @UseFilters(new HttpExceptionFilter())
+//   @UseInterceptors(
+//     FileFieldsInterceptor(
+//       [
+//         { name: 'image', maxCount: 1 },
+//         { name: 'file',  maxCount: 1 },
+//       ],
+//       {
+//         storage: memoryStorage(),
+//         limits: { fileSize: 10 * 1024 * 1024 },
+//       },
+//     ),
+//   )
+// async recognize(
+//   @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
+//   @Body() body: RecognizeDto,
+//   @Query() query: RecognizeDto,
+//   @Req() req,
+//   @Res() res: Response,
+// ) {
+//   const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
+//   const userId = req.user.sub;
 
 
   
 
-  // 1. Get image buffer (your logic is fine)
- let buf: Buffer | undefined;
-    const up = files?.image?.[0] ?? files?.file?.[0];
-    if (up?.buffer) {
-      buf = up.buffer;
-    } else if (get('image_base64')) {
-      buf = Buffer.from(get('image_base64') as string, 'base64');
-    } else if (get('image_url')) {
-      const url = get('image_url') as string;
-      const resp = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer', timeout: 35000 });
-      buf = Buffer.from(resp.data as any);
-    }
-
-    if (!buf) {
-      throw new BadRequestException(
-        "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
-      );
-    }
-
-
-  // 2. Validate coordinates (your logic is fine, just ensure it's here)
-  const latStr = get('lat') as string;
-  const lonStr = get('lon') as string;
-  console.log("the latStr", latStr, "the lonStr",lonStr)
-  let lat: number | undefined;
-  let lon: number | undefined;
-
-  if (latStr && lonStr) {
-    lat = parseFloat(latStr);
-    lon = parseFloat(lonStr);
-    if (isNaN(lat) || isNaN(lon)) {
-      throw new BadRequestException('Invalid coordinates provided.');
-    }
-  }
-  const topK = get('top_k') ? parseInt(get('top_k') as string, 10) : 5;
-console.log("the lat", lat, "the lon",lon,"topK", topK )
-  // 3. Call the service
-  const results = await this.visionService.recognize(buf, { lat, lon, topK });
-   console.log("the result", results)
-  if (results.status === 'FAILURE') {
-    // Inside this block, TypeScript knows `results` is a `FailureRecognition`.
-    // We handle the error and stop the function by throwing.
-console.log("in failure")
- return res.status(400).json({ status: 400, message: 'FAILURE', data: results.message });
-    // throw new BadRequestException(results.message);
-  }
-
-
-  if (results.data.length === 0) {
-    // This case handles if the success data is for some reason empty.
-    // throw new BadRequestException('No landmark recognized.');
-    return res.status(400).json({ status: 400, message: 'FAILURE', data: 'Building not recognized.' });
-  }
-
-
-
-
-  // It is now safe to access the data. The TypeScript error is resolved.
-  const placeName = results.data[0].name;
-
-  console.log("the successful result is:", results);
-
-  // The rest of your logic can now proceed 
-  
-  
-
-  const findPlaceDetail = await this.visionService.findPlaceDetail(placeName);
-  if (findPlaceDetail) {
-    await this.userService.addScanIdInUser(userId, findPlaceDetail.id);
-    return res.status(200).json({ status: 200, message: 'success', data: findPlaceDetail });
-  }
-
-  const response = await this.visionService.getDetail(placeName);
-  if (response.status === 200) {
-    const saved = await this.visionService.upsertPlaceFromDetail(response.data, placeName);
-    await this.userService.addScanIdInUser(userId, saved.id);
-    return res.status(200).json({ status: 200, message: 'success', data: saved });
-  }
-
-  else if(response.status !== 200){
-
-    const searchName = await this.visionService.searchTitle(placeName);
-
-    if(searchName.status === 200){
-       const response = await this.visionService.getDetail(searchName.title);
-  if (response.status === 200) {
-    const saved = await this.visionService.upsertPlaceFromDetail(response.data, searchName.title);
-    await this.userService.addScanIdInUser(userId, saved.id);
-    return res.status(200).json({ status: 200, message: 'success', data: saved });
-  }
-
-
-    }
-
-  }
-
-  // throw new BadRequestException(`Failed to get landmark details of ${placeName} `);
-
-    return res.status(400).json({ status: 400, message: 'FAILURE', data: `Failed to get building details of ${placeName}` });
-
-
-
-
-  
-//     return res.status(200).json({
-//     "status": 200,
-//     "message": "success",
-//     "data": {
-//         "id": "68fcbf2854a04c18631281ce",
-//         "title": "Niagara Falls",
-//         "thumbnailImage": "http://localhost:4000/files/68fcbf1d7ede1cbb7993da48",
-//         "originalImage": "http://localhost:4000/files/68fcbf077ede1cbb7993da38",
-//         "description": "Niagara Falls is a group of three waterfalls at the southern end of Niagara Gorge, spanning the border between the province of Ontario in Canada and the state of New York in the United States. The largest of the three is Horseshoe Falls, which straddles the international border of the two countries. It is also known as the Canadian Falls. The smaller American Falls and Bridal Veil Falls lie within the United States. Bridal Veil Falls is separated from Horseshoe Falls by Goat Island and from American Falls by Luna Island, with both islands situated in New York.\nFormed by the Niagara River, which drains Lake Erie into Lake Ontario, the combined falls have the highest flow rate of any waterfall in North America that has a vertical drop of more than 50 m (164 ft). During peak daytime tourist hours, more than 168,000 m3 (5.9 million cu ft) of water goes over the crest of the falls every minute. Horseshoe Falls is the most powerful waterfall in North America, as measured by flow rate. Niagara Falls is famed for its beauty and is a valuable source of hydroelectric power. Balancing recreational, commercial, and industrial uses has been a challenge for the stewards of the falls since the 19th...",
-//         "countries": "Canada",
-//         "administrativeAreas": "Ontario",
-//         "ranges": [],
-//         "instanceOf": [
-//             "tourist attraction",
-//             "waterfall",
-//             "horseshoe waterfall"
-//         ],
-//         "coordinates": [
-//             -79.071,
-//             43.08
-//         ],
-//         "height": 57
+//   // 1. Get image buffer (your logic is fine)
+//  let buf: Buffer | undefined;
+//     const up = files?.image?.[0] ?? files?.file?.[0];
+//     if (up?.buffer) {
+//       buf = up.buffer;
+//     } else if (get('image_base64')) {
+//       buf = Buffer.from(get('image_base64') as string, 'base64');
+//     } else if (get('image_url')) {
+//       const url = get('image_url') as string;
+//       const resp = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer', timeout: 35000 });
+//       buf = Buffer.from(resp.data as any);
 //     }
-// })
+
+//     if (!buf) {
+//       throw new BadRequestException(
+//         "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
+//       );
+//     }
+
+
+//   // 2. Validate coordinates (your logic is fine, just ensure it's here)
+//   const latStr = get('lat') as string;
+//   const lonStr = get('lon') as string;
+//   console.log("the latStr", latStr, "the lonStr",lonStr)
+//   let lat: number | undefined;
+//   let lon: number | undefined;
+
+//   if (latStr && lonStr) {
+//     lat = parseFloat(latStr);
+//     lon = parseFloat(lonStr);
+//     if (isNaN(lat) || isNaN(lon)) {
+//       throw new BadRequestException('Invalid coordinates provided.');
+//     }
+//   }
+//   const topK = get('top_k') ? parseInt(get('top_k') as string, 10) : 5;
+// console.log("the lat", lat, "the lon",lon,"topK", topK )
+//   // 3. Call the service
+//   const results = await this.visionService.recognize(buf, { lat, lon, topK });
+//    console.log("the result", results)
+//   if (results.status === 'FAILURE') {
+//     // Inside this block, TypeScript knows `results` is a `FailureRecognition`.
+//     // We handle the error and stop the function by throwing.
+// console.log("in failure")
+//  return res.status(400).json({ status: 400, message: 'FAILURE', data: results.message });
+//     // throw new BadRequestException(results.message);
+//   }
+
+
+//   if (results.data.length === 0) {
+//     // This case handles if the success data is for some reason empty.
+//     // throw new BadRequestException('No landmark recognized.');
+//     return res.status(400).json({ status: 400, message: 'FAILURE', data: 'Building not recognized.' });
+//   }
+
+
+
+
+//   // It is now safe to access the data. The TypeScript error is resolved.
+//   const placeName = results.data[0].name;
+
+//   console.log("the successful result is:", results);
+
+//   // The rest of your logic can now proceed 
+  
   
 
-}
+//   const findPlaceDetail = await this.visionService.findPlaceDetail(placeName);
+//   if (findPlaceDetail) {
+//     await this.userService.addScanIdInUser(userId, findPlaceDetail.id);
+//     return res.status(200).json({ status: 200, message: 'success', data: findPlaceDetail });
+//   }
+
+//   const response = await this.visionService.getDetail(placeName);
+//   if (response.status === 200) {
+//     const saved = await this.visionService.upsertPlaceFromDetail(response.data, placeName);
+//     await this.userService.addScanIdInUser(userId, saved.id);
+//     return res.status(200).json({ status: 200, message: 'success', data: saved });
+//   }
+
+//   else if(response.status !== 200){
+
+//     const searchName = await this.visionService.searchTitle(placeName);
+
+//     if(searchName.status === 200){
+//        const response = await this.visionService.getDetail(searchName.title);
+//   if (response.status === 200) {
+//     const saved = await this.visionService.upsertPlaceFromDetail(response.data, searchName.title);
+//     await this.userService.addScanIdInUser(userId, saved.id);
+//     return res.status(200).json({ status: 200, message: 'success', data: saved });
+//   }
+
+
+//     }
+
+//   }
+
+//   // throw new BadRequestException(`Failed to get landmark details of ${placeName} `);
+
+//     return res.status(400).json({ status: 400, message: 'FAILURE', data: `Failed to get building details of ${placeName}` });
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-@Post('/Image-Information')
-@UseGuards(AuthGuard)
-@UseFilters(new HttpExceptionFilter())
-async getDataFromWikipedia(
-  @Req() req,
-  @Body() fetchDataFromWikipedia: FetchDataFromWikipedia,
-  @Res() res: Response,
-): Promise<any> {
-  const { PlaceName } = fetchDataFromWikipedia;
-  const userId = req.user.sub;
-
-
-
-
-
-
-  const findPlaceDetail = await this.visionService.findPlaceDetail(PlaceName);
-  console.log("the findPlaceDetail", findPlaceDetail)
-  if (findPlaceDetail) {
-    await this.userService.addScanIdInUser(userId, findPlaceDetail.id);
-    return res.status(200).json({ status: 200, message: 'success', data: findPlaceDetail });
-  }
-
-  const response = await this.visionService.getDetail(PlaceName);
-  console.log("the response of get detail", response)
-  if (response.status === 200) {
-    const saved = await this.visionService.upsertPlaceFromDetail(response.data, PlaceName);
-    await this.userService.addScanIdInUser(userId, saved.id);
-    return res.status(200).json({ status: 200, message: 'success', data: saved });
-  }
   
-  else if(response.status !== 200){
+// //     return res.status(200).json({
+// //     "status": 200,
+// //     "message": "success",
+// //     "data": {
+// //         "id": "68fcbf2854a04c18631281ce",
+// //         "title": "Niagara Falls",
+// //         "thumbnailImage": "http://localhost:4000/files/68fcbf1d7ede1cbb7993da48",
+// //         "originalImage": "http://localhost:4000/files/68fcbf077ede1cbb7993da38",
+// //         "description": "Niagara Falls is a group of three waterfalls at the southern end of Niagara Gorge, spanning the border between the province of Ontario in Canada and the state of New York in the United States. The largest of the three is Horseshoe Falls, which straddles the international border of the two countries. It is also known as the Canadian Falls. The smaller American Falls and Bridal Veil Falls lie within the United States. Bridal Veil Falls is separated from Horseshoe Falls by Goat Island and from American Falls by Luna Island, with both islands situated in New York.\nFormed by the Niagara River, which drains Lake Erie into Lake Ontario, the combined falls have the highest flow rate of any waterfall in North America that has a vertical drop of more than 50 m (164 ft). During peak daytime tourist hours, more than 168,000 m3 (5.9 million cu ft) of water goes over the crest of the falls every minute. Horseshoe Falls is the most powerful waterfall in North America, as measured by flow rate. Niagara Falls is famed for its beauty and is a valuable source of hydroelectric power. Balancing recreational, commercial, and industrial uses has been a challenge for the stewards of the falls since the 19th...",
+// //         "countries": "Canada",
+// //         "administrativeAreas": "Ontario",
+// //         "ranges": [],
+// //         "instanceOf": [
+// //             "tourist attraction",
+// //             "waterfall",
+// //             "horseshoe waterfall"
+// //         ],
+// //         "coordinates": [
+// //             -79.071,
+// //             43.08
+// //         ],
+// //         "height": 57
+// //     }
+// // })
+  
 
-    console.log("in this 400 repsone ")
-
-    const searchName = await this.visionService.searchTitle(PlaceName);
-
-    if(searchName.status === 200){
-       const response = await this.visionService.getDetail(searchName.title);
-  if (response.status === 200) {
-    const saved = await this.visionService.upsertPlaceFromDetail(response.data, searchName.title);
-    await this.userService.addScanIdInUser(userId, saved.id);
-    return res.status(200).json({ status: 200, message: 'success', data: saved });
-  }
-
-
-    }
-
-  }
-
-
-}
+// }
 
 
 
@@ -288,122 +222,418 @@ async getDataFromWikipedia(
 
 
 
-        @ApiOperation({
-          summary: "fetch ",
-          description: "Get scan summary of specific user",
-        })
-        @ApiResponse({
-          status: 200,
-          description: 'Get scan summary of specific user Successfully',  })
-        @ApiResponse({ status: 403, description: "Forbidden." })
-        @UseGuards(AuthGuard)
-        @Get('get-scans')
-        @UseFilters(new HttpExceptionFilter())
-        async getScans(@Req() req, @Res() res: Response): Promise<any> {
+
+
+
+
+
+// @Post('/Image-Information')
+// @UseGuards(AuthGuard)
+// @UseFilters(new HttpExceptionFilter())
+// async getDataFromWikipedia(
+//   @Req() req,
+//   @Body() fetchDataFromWikipedia: FetchDataFromWikipedia,
+//   @Res() res: Response,
+// ): Promise<any> {
+//   const { PlaceName } = fetchDataFromWikipedia;
+//   const userId = req.user.sub;
+
+
+
+
+
+
+//   const findPlaceDetail = await this.visionService.findPlaceDetail(PlaceName);
+//   console.log("the findPlaceDetail", findPlaceDetail)
+//   if (findPlaceDetail) {
+//     await this.userService.addScanIdInUser(userId, findPlaceDetail.id);
+//     return res.status(200).json({ status: 200, message: 'success', data: findPlaceDetail });
+//   }
+
+//   const response = await this.visionService.getDetail(PlaceName);
+//   console.log("the response of get detail", response)
+//   if (response.status === 200) {
+//     const saved = await this.visionService.upsertPlaceFromDetail(response.data, PlaceName);
+//     await this.userService.addScanIdInUser(userId, saved.id);
+//     return res.status(200).json({ status: 200, message: 'success', data: saved });
+//   }
+  
+//   else if(response.status !== 200){
+
+//     console.log("in this 400 repsone ")
+
+//     const searchName = await this.visionService.searchTitle(PlaceName);
+
+//     if(searchName.status === 200){
+//        const response = await this.visionService.getDetail(searchName.title);
+//   if (response.status === 200) {
+//     const saved = await this.visionService.upsertPlaceFromDetail(response.data, searchName.title);
+//     await this.userService.addScanIdInUser(userId, saved.id);
+//     return res.status(200).json({ status: 200, message: 'success', data: saved });
+//   }
+
+
+//     }
+
+//   }
+
+
+// }
+
+
+
+
+
+
+
+
+
+//         @ApiOperation({
+//           summary: "fetch ",
+//           description: "Get scan summary of specific user",
+//         })
+//         @ApiResponse({
+//           status: 200,
+//           description: 'Get scan summary of specific user Successfully',  })
+//         @ApiResponse({ status: 403, description: "Forbidden." })
+//         @UseGuards(AuthGuard)
+//         @Get('get-scans')
+//         @UseFilters(new HttpExceptionFilter())
+//         async getScans(@Req() req, @Res() res: Response): Promise<any> {
       
-          const userId = req.user.sub;
-          console.log("the user is in getLoginUserData", userId)
+//           const userId = req.user.sub;
+//           console.log("the user is in getLoginUserData", userId)
       
       
-          const response = await this.userService.getScansId(userId)
+//           const response = await this.userService.getScansId(userId)
       
-          console.log("the response in get scans ", response)
+//           console.log("the response in get scans ", response)
 
-          if(response.status === 200){
+//           if(response.status === 200){
 
-            const getScansSummary = await this.visionService.getScansSummary(response.scanAreas)
+//             const getScansSummary = await this.visionService.getScansSummary(response.scanAreas)
 
 
-            // console.log("the get scans Summary is", getScansSummary)
+//             // console.log("the get scans Summary is", getScansSummary)
 
             
-    const userId = req.user.sub;
-    const user = await this.userService.findOne(userId);
+//     const userId = req.user.sub;
+//     const user = await this.userService.findOne(userId);
 
-    const translated = await this.translationService.translate(
-      getScansSummary.scans,
-      user.languageCode,
-    );
+//     const translated = await this.translationService.translate(
+//       getScansSummary.scans,
+//       user.languageCode,
+//     );
 
 
-console.log("the translated", translated)
+// console.log("the translated", translated)
 
-                return res.status(200).json({
-      status: 200,
-      message: getScansSummary.message,
-      data: translated,
-    });
+//                 return res.status(200).json({
+//       status: 200,
+//       message: getScansSummary.message,
+//       data: translated,
+//     });
 
-          }
+//           }
    
       
-          return res.status(400).json({
-    status: 400,
-    message: "failed",
-    data: "error in getting the scan details",
-  });
+//           return res.status(400).json({
+//     status: 400,
+//     message: "failed",
+//     data: "error in getting the scan details",
+//   });
       
       
-        }
+//         }
 
 
 
-@UseGuards(AuthGuard)
-@Get('get-scan/:id')
-async getSingleScans(@Param('id') id: string, @Req() req, @Res() res: Response) {
-  try {
-    const getScanDetail = await this.visionService.getScansDetails(id);
+// @UseGuards(AuthGuard)
+// @Get('get-scan/:id')
+// async getSingleScans(@Param('id') id: string, @Req() req, @Res() res: Response) {
+//   try {
+//     const getScanDetail = await this.visionService.getScansDetails(id);
 
-    if (getScanDetail.status !== 200) {
-      return res.status(400).json({
-        status: getScanDetail.status,
-        message: getScanDetail.message,
-        data: getScanDetail.error,
-      });
-    }
+//     if (getScanDetail.status !== 200) {
+//       return res.status(400).json({
+//         status: getScanDetail.status,
+//         message: getScanDetail.message,
+//         data: getScanDetail.error,
+//       });
+//     }
 
-    const userId = req.user.sub;
-    const user = await this.userService.findOne(userId);
+//     const userId = req.user.sub;
+//     const user = await this.userService.findOne(userId);
 
-    const translated = await this.translationService.translate(
-      getScanDetail.scanDetail,
-      user.languageCode,
-    );
+//     const translated = await this.translationService.translate(
+//       getScanDetail.scanDetail,
+//       user.languageCode,
+//     );
 
-    return res.status(200).json({
-      status: getScanDetail.status,
-      message: getScanDetail.message,
-      data: translated,
-    });
-  } catch (error) {
-    console.error('Error in getSingleScans:', error);
+//     return res.status(200).json({
+//       status: getScanDetail.status,
+//       message: getScanDetail.message,
+//       data: translated,
+//     });
+//   } catch (error) {
+//     console.error('Error in getSingleScans:', error);
 
-    // Decide what you want to send if translation fails
-    return res.status(502).json({
-      status: 502,
-      message: 'Failed to translate scan detail',
-      // optionally include more info in dev env
-    });
-  }
-}
+//     // Decide what you want to send if translation fails
+//     return res.status(502).json({
+//       status: 502,
+//       message: 'Failed to translate scan detail',
+//       // optionally include more info in dev env
+//     });
+//   }
+// }
  
         
 
 
   
- @Get('search-name')
-  async search( @Res() res: Response, @Query('label') label?: string): Promise<any> {
-    if (!label) throw new BadRequestException('Query param "label" is required');
+//  @Get('search-name')
+//   async search( @Res() res: Response, @Query('label') label?: string): Promise<any> {
+//     if (!label) throw new BadRequestException('Query param "label" is required');
 
-    console.log("the label in name", label)
-    const searchName = await this.visionService.searchTitle(label);
-           return res.status(200).json({
-      status: searchName.status,
-      message: searchName.message,
-      data: searchName.title,
-    });
-  }
+//     console.log("the label in name", label)
+//     const searchName = await this.visionService.searchTitle(label);
+//            return res.status(200).json({
+//       status: searchName.status,
+//       message: searchName.message,
+//       data: searchName.title,
+//     });
+//   }
 
+
+
+
+
+
+
+
+// @Post('lens')
+// @UseGuards(AuthGuard)
+// @UseFilters(new HttpExceptionFilter())
+// @UseInterceptors(
+//   FileFieldsInterceptor(
+//     [
+//       { name: 'image', maxCount: 1 },
+//       { name: 'file',  maxCount: 1 },
+//     ],
+//     {
+//       storage: memoryStorage(),
+//       limits: { fileSize: 10 * 1024 * 1024 },
+//     },
+//   ),
+// )
+// async recognizeWithLenss(
+//   @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
+//   @Body() body: RecognizeDto,
+//   @Query() query: RecognizeDto,
+//   @Req() req,
+//   @Res() res: Response,
+// ) {
+//   const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
+//   const userId = req.user?.sub;
+
+//   console.log('the body', body);
+
+//   // --- parse user location from frontend: lat, lon ---
+//   const latRaw = get('lat');
+//   const lonRaw = get('lon');
+
+//   const userLat =
+//     latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
+//   const userLon =
+//     lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
+
+//   //  const userLat = 40.743474550126685;
+//   // const userLon = -73.97498397090854;
+
+//   if (
+//     (latRaw !== undefined && Number.isNaN(userLat)) ||
+//     (lonRaw !== undefined && Number.isNaN(userLon))
+//   ) {
+//     throw new BadRequestException('Invalid lat or lon');
+//   }
+
+//   // 1) Build image buffer
+//   let buf: Buffer | undefined;
+//   const up = files?.image?.[0] ?? files?.file?.[0];
+
+//   if (up?.buffer) {
+//     buf = up.buffer;
+//   } else if (get('image_base64')) {
+//     buf = Buffer.from(get('image_base64') as string, 'base64');
+//   } else if (get('image_url')) {
+//     const url = get('image_url') as string;
+//     const resp = await axios.get<ArrayBuffer>(url, {
+//       responseType: 'arraybuffer',
+//       timeout: 35000,
+//     });
+//     buf = Buffer.from(resp.data as any);
+//   }
+
+//   if (!buf) {
+//     throw new BadRequestException(
+//       "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
+//     );
+//   }
+
+//   try {
+//     // 2) Google Lens via SerpApi
+//     const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
+
+//     if (lensResult.lowConfidence || !lensResult.first) {
+//       return res.status(400).json({
+//         status: 400,
+//         message: 'LOW_CONFIDENCE',
+//         data:
+//           'Please try again and take a clearer photo from a different angle.',
+//       });
+//     }
+
+//     const first = lensResult.first;
+
+//     // 3) Derive canonical place name
+//     const placeName: string =
+//       lensResult.label ||
+//       lensResult.raw?.knowledge_graph?.title ||
+//       lensResult.raw?.knowledge_graph?.name ||
+//       lensResult.raw?.related_content?.[0]?.query ||
+//       first.title ||
+//       first.name ||
+//       first.link_title ||
+//       first.query ||
+//       'Unknown building';
+
+//     // 4) Existing place in DB? -> check area, then return
+//     const existing = await this.visionService.findPlaceDetailSerp(placeName);
+//     if (existing) {
+//       // existing is a flattened DTO, so latitude/longitude likely live in aiLatitude/aiLongitude
+//       const existingAny = existing as any;
+
+//       const existingLat =
+//         existingAny.aiLatitude ??
+//         existingAny.latitude ??
+//         existingAny.ai?.latitude ??
+//         existingAny.coordinates?.coordinates?.[1];
+
+//       const existingLon =
+//         existingAny.aiLongitude ??
+//         existingAny.longitude ??
+//         existingAny.ai?.longitude ??
+//         existingAny.coordinates?.coordinates?.[0];
+
+//       if (
+//         userLat != null &&
+//         userLon != null &&
+//         existingLat != null &&
+//         existingLon != null
+//       ) {
+//         const distKm = this.visionService.distanceKm(
+//           userLat,
+//           userLon,
+//           Number(existingLat),
+//           Number(existingLon),
+//         );
+
+//         const MAX_DISTANCE_KM = 50; // tune as needed
+
+//         if (distKm > MAX_DISTANCE_KM) {
+//           return res.status(400).json({
+//             status: 400,
+//             message: 'LOCATION_MISMATCH',
+//             data:
+//               'You are out of zone. Please come in 50KM radius',
+//           });
+//         }
+//       }
+
+//       await this.userService.addScanIdInUser(userId, existing.id);
+//       return res.status(200).json({
+//         status: 200,
+//         message: 'success',
+//         data: existing,
+//       });
+//     }
+
+//     // 5) No existing place -> call ChatGPT
+//     const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+//     console.log('the gpt data', gpt);
+
+//     // 6) Area restriction vs GPT coordinates
+//     if (
+//       userLat != null &&
+//       userLon != null &&
+//       gpt?.latitude != null &&
+//       gpt?.longitude != null
+//     ) {
+//       const distKm = this.visionService.distanceKm(
+//         userLat,
+//         userLon,
+//         Number(gpt.latitude),
+//         Number(gpt.longitude),
+//       );
+
+//       const MAX_DISTANCE_KM = 50; // tune as needed
+
+//       if (distKm > MAX_DISTANCE_KM) {
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOCATION_MISMATCH',
+//           data:
+//            'You are out of zone. Please come in 50KM radius',
+//         });
+//       }
+//     }
+
+//     // 7) Upsert place in DB
+//     const placeDoc = await this.visionService.upsertPlaceFromLens({
+//       first,
+//       imageUrl: lensResult.imageUrl,
+//       gpt,
+//     });
+
+//     // 8) Attach place id to user
+//     await this.userService.addScanIdInUser(userId, String(placeDoc._id));
+
+//     // 9) Response: use AI title as main title
+//     const displayTitle = placeDoc.ai?.title || placeDoc.title;
+
+//     const responseData = {
+//       id: placeDoc._id,
+//       title: displayTitle,                     // AI title for frontend
+//       thumbnailImage: placeDoc.images?.thumbnail,
+//       originalImage: placeDoc.images?.original,
+//       chatgptTitle: placeDoc.ai?.title,
+//       shortDescription: placeDoc.ai?.shortDescription,
+//       tourismDescription: placeDoc.ai?.tourismDescription,
+//       funFacts: placeDoc.ai?.funFacts,
+//       heightMeters: placeDoc.ai?.heightMeters,
+//       latitude: placeDoc.ai?.latitude,
+//       longitude: placeDoc.ai?.longitude,
+//       architectureStyle: placeDoc.ai?.architectureStyle,
+//         architectName: placeDoc.ai?.architectName,  // <-- NEW
+//   location: placeDoc.ai?.location, 
+//     };
+
+//     console.log('the response', responseData);
+
+//     return res.status(200).json({
+//       status: 200,
+//       message: 'success',
+//       data: responseData,
+//     });
+//   } catch (e: any) {
+//     console.error('[Lens] error:', e?.message || e);
+//     return res.status(400).json({
+//       status: 400,
+//       message: 'FAILURE',
+//       data: e?.message || 'Google Lens lookup failed',
+//     });
+//   }
+// }
 
 
 
@@ -442,13 +672,14 @@ async recognizeWithLenss(
   const latRaw = get('lat');
   const lonRaw = get('lon');
 
+  //   const userLat = 40.75144488723498
+  // const userLon = -73.99181394960962
+
   const userLat =
     latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
   const userLon =
     lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
 
-  //  const userLat = 40.743474550126685;
-  // const userLon = -73.97498397090854;
 
   if (
     (latRaw !== undefined && Number.isNaN(userLat)) ||
@@ -484,12 +715,32 @@ async recognizeWithLenss(
     // 2) Google Lens via SerpApi
     const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
 
-    if (lensResult.lowConfidence || !lensResult.first) {
+    // Only treat as failure if there is NO visual match at all
+    if (!lensResult.first) {
+      let nearbyPlaces: any[] = [];
+
+      // If we have user location, fetch nearby famous places within 3 km
+      if (userLat != null && userLon != null) {
+        try {
+          nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+            userLat,
+            userLon,
+            3000, // 3km radius in meters
+          );
+        } catch (err) {
+          console.error('[Lens] nearbyPlaces error:', err);
+        }
+      }
+
       return res.status(400).json({
         status: 400,
         message: 'LOW_CONFIDENCE',
-        data:
-          'Please try again and take a clearer photo from a different angle.',
+        data: {
+          reason:
+            'We could not confidently recognize this building. ' +
+            'Please try again and take a clearer photo from a different angle.',
+          nearbyPlaces,
+        },
       });
     }
 
@@ -507,10 +758,13 @@ async recognizeWithLenss(
       first.query ||
       'Unknown building';
 
-    // 4) Existing place in DB? -> check area, then return
+    // distance thresholds (km)
+    const STRICT_MAX_KM = 1;   // must be within 1km of user to trust match
+    const ZONE_MAX_KM   = 30;  // allowed zone radius
+
+    // 4) Existing place in DB? -> check area restriction, then return
     const existing = await this.visionService.findPlaceDetailSerp(placeName);
     if (existing) {
-      // existing is a flattened DTO, so latitude/longitude likely live in aiLatitude/aiLongitude
       const existingAny = existing as any;
 
       const existingLat =
@@ -523,7 +777,7 @@ async recognizeWithLenss(
         existingAny.aiLongitude ??
         existingAny.longitude ??
         existingAny.ai?.longitude ??
-        existingAny.coordinates?.coordinates?.[0];
+         existingAny.coordinates?.coordinates?.[0];
 
       if (
         userLat != null &&
@@ -538,14 +792,11 @@ async recognizeWithLenss(
           Number(existingLon),
         );
 
-        const MAX_DISTANCE_KM = 50; // tune as needed
-
-        if (distKm > MAX_DISTANCE_KM) {
+        if (distKm > ZONE_MAX_KM) {
           return res.status(400).json({
             status: 400,
             message: 'LOCATION_MISMATCH',
-            data:
-              'You are out of zone. Please come in 50KM radius',
+            data: 'You are out of zone. Please come in 50KM radius',
           });
         }
       }
@@ -559,34 +810,241 @@ async recognizeWithLenss(
     }
 
     // 5) No existing place -> call ChatGPT
-    const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
-    console.log('the gpt data', gpt);
 
-    // 6) Area restriction vs GPT coordinates
-    if (
-      userLat != null &&
-      userLon != null &&
-      gpt?.latitude != null &&
-      gpt?.longitude != null
-    ) {
-      const distKm = this.visionService.distanceKm(
+const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+console.log('the gpt data', gpt);
+
+// 6) Use OSM (first) or GPT coords + user location to decide confidence / zone
+if (userLat != null && userLon != null) {
+  let targetLat: number | null = null;
+  let targetLon: number | null = null;
+  let coordSource: 'osm' | 'gpt' | null = null;
+
+  // 1) Try OSM / Nominatim first
+  try {
+    const osmResult = await this.visionService.searchNominatim(placeName, userLat, userLon);
+    if (osmResult) {
+      targetLat = osmResult.lat;
+      targetLon = osmResult.lon;
+      coordSource = 'osm';
+      console.log('Using OSM coordinates:', osmResult);
+    } else {
+      console.log('OSM could not find coordinates for', placeName);
+    }
+  } catch (e) {
+    console.error('Error while calling Nominatim:', e);
+  }
+
+  // 2) If OSM did NOT give coords, fallback to GPT coords
+  if (targetLat == null || targetLon == null) {
+    const gptLat =
+      gpt?.latitude != null ? Number(gpt.latitude) : NaN;
+    const gptLon =
+      gpt?.longitude != null ? Number(gpt.longitude) : NaN;
+
+    if (!Number.isNaN(gptLat) && !Number.isNaN(gptLon)) {
+      targetLat = gptLat;
+      targetLon = gptLon;
+      coordSource = 'gpt';
+      console.log('Using GPT coordinates:', { lat: gptLat, lon: gptLon });
+    }
+  }
+
+  // 3) If still no coordinates from OSM or GPT -> LOW_CONFIDENCE + nearbyPlaces
+  if (targetLat == null || targetLon == null) {
+    let nearbyPlaces: any[] = [];
+    try {
+      nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
         userLat,
         userLon,
-        Number(gpt.latitude),
-        Number(gpt.longitude),
+        3000, // 3km radius
       );
-
-      const MAX_DISTANCE_KM = 50; // tune as needed
-
-      if (distKm > MAX_DISTANCE_KM) {
-        return res.status(400).json({
-          status: 400,
-          message: 'LOCATION_MISMATCH',
-          data:
-           'You are out of zone. Please come in 50KM radius',
-        });
-      }
+    } catch (err) {
+      console.error(
+        '[Lens] nearbyPlaces error (no coords from OSM or GPT):',
+        err,
+      );
     }
+
+    return res.status(400).json({
+      status: 400,
+      message: 'LOW_CONFIDENCE',
+      data: {
+        reason:
+          'We could not confidently recognize this building (no reliable location found). ' +
+          'Please try again and take a clearer photo from a different angle.',
+        nearbyPlaces,
+      },
+    });
+  }
+
+  // 4) We have coordinates (from OSM or GPT) -> compute distance
+  const distKm = this.visionService.distanceKm(
+    userLat,
+    userLon,
+    targetLat,
+    targetLon,
+  );
+  console.log(`Distance from user (${coordSource}):`, distKm, 'km');
+
+  // B1: way outside general zone -> LOCATION_MISMATCH (you treat as LOW_CONFIDENCE)
+  if (distKm > ZONE_MAX_KM) {
+    let nearbyPlaces: any[] = [];
+    try {
+      nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+        userLat,
+        userLon,
+        3000, // 3km radius
+      );
+    } catch (err) {
+      console.error('[Lens] nearbyPlaces error (zone mismatch):', err);
+    }
+
+    return res.status(400).json({
+      status: 400,
+      message: 'LOW_CONFIDENCE',
+      data: {
+        reason:
+          'We could not confidently match this building within your location. ' +
+          'Please try again and take a clearer photo from a different angle.',
+        nearbyPlaces,
+      },
+    });
+  }
+
+  // B2: inside zone but > 3km -> LOW_CONFIDENCE + nearbyPlaces
+  if (distKm > STRICT_MAX_KM) {
+    let nearbyPlaces: any[] = [];
+    try {
+      nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+        userLat,
+        userLon,
+        3000, // 3km radius
+      );
+    } catch (err) {
+      console.error('[Lens] nearbyPlaces error (strict radius):', err);
+    }
+
+    return res.status(400).json({
+      status: 400,
+      message: 'LOW_CONFIDENCE',
+      data: {
+        reason:
+          'We could not confidently match this building within 3km of your location. ' +
+          'Please try again and take a clearer photo from a different angle.',
+        nearbyPlaces,
+      },
+    });
+  }
+
+  // If you reach here: distKm <= STRICT_MAX_KM -> HIGH_CONFIDENCE / success logic below...
+  // e.g. return recognized building, etc.
+}
+
+
+
+
+
+//     const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+//     console.log('the gpt data', gpt);
+
+//     // 6) Use GPT coords + user location to decide confidence / zone
+//     if (userLat != null && userLon != null) {
+     
+//       // Case A: GPT has NO coordinates at all -> LOW_CONFIDENCE + nearbyPlaces
+//       if (gpt?.latitude == null || gpt?.longitude == null) {
+
+
+
+//         let nearbyPlaces: any[] = [];
+//         try {
+//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+//             userLat,
+//             userLon,
+//                3000, // 3km radius in meters
+//           );
+//         } catch (err) {
+//           console.error('[Lens/GPT] nearbyPlaces error (no coords):', err);
+//         }
+
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently recognize this building (no reliable location found). ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // Case B: GPT has coordinates -> compute distance
+//       const distKm = this.visionService.distanceKm(
+//         userLat,
+//         userLon,
+//         Number(gpt.latitude),
+//         Number(gpt.longitude),
+//       );
+
+//       // B1: way outside general zone -> LOCATION_MISMATCH (hard fail)
+//       if (distKm > ZONE_MAX_KM) {
+
+//  let nearbyPlaces: any[] = [];
+//         try {
+//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+//             userLat,
+//             userLon,
+//               3000, // 3km radius in meters
+//           );
+//         } catch (err) {
+//           console.error('[Lens/GPT] nearbyPlaces error (no coords):', err);
+//         }
+
+//         // return res.status(400).json({
+//         //   status: 400,
+//         //   message: 'LOCATION_MISMATCH',
+//         //   data: 'You are out of zone. Please come in 50KM radius',
+//         // });
+
+        
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently match this building within your location. ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // B2: inside zone but > 3km -> LOW_CONFIDENCE + nearbyPlaces
+//       if (distKm > STRICT_MAX_KM) {
+//         let nearbyPlaces: any[] = [];
+//         try {
+//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+//             userLat,
+//             userLon,
+//                3000, // 3km radius in meters
+//           );
+//         } catch (err) {
+//           console.error('[Lens/GPT] nearbyPlaces error (strict):', err);
+//         }
+
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently match this building within 3km of your location. ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+//     }
 
     // 7) Upsert place in DB
     const placeDoc = await this.visionService.upsertPlaceFromLens({
@@ -603,7 +1061,7 @@ async recognizeWithLenss(
 
     const responseData = {
       id: placeDoc._id,
-      title: displayTitle,                     // AI title for frontend
+      title: displayTitle,
       thumbnailImage: placeDoc.images?.thumbnail,
       originalImage: placeDoc.images?.original,
       chatgptTitle: placeDoc.ai?.title,
@@ -614,8 +1072,8 @@ async recognizeWithLenss(
       latitude: placeDoc.ai?.latitude,
       longitude: placeDoc.ai?.longitude,
       architectureStyle: placeDoc.ai?.architectureStyle,
-        architectName: placeDoc.ai?.architectName,  // <-- NEW
-  location: placeDoc.ai?.location, 
+      architectName: placeDoc.ai?.architectName,
+      location: placeDoc.ai?.location,
     };
 
     console.log('the response', responseData);
@@ -638,15 +1096,6 @@ async recognizeWithLenss(
 
 
 
-
-
-
-
-
-
-
-
-
 @UseGuards(AuthGuard)
 @Get('get-scan-serp/:id')
 async getSingleScanSerp(
@@ -658,6 +1107,8 @@ async getSingleScanSerp(
     // 1) Get SERP/Lens scan detail by id
     const getScanDetail = await this.visionService.getScansDetailsSerp(id);
 
+
+console.log("the scan detail", getScanDetail)
     if (getScanDetail.status !== 200) {
       return res.status(400).json({
         status: getScanDetail.status,
