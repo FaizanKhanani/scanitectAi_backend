@@ -82,8 +82,12 @@ interface AiInfoResponse {
   location: String,   
 }
 
+
+
+
 interface PlaceResponseSerp extends PlaceResponse {
   ai?: AiInfoResponse;
+  
 }
 
 interface PlaceResponse {
@@ -115,6 +119,11 @@ coordinates?: {
 type?: string;
 coordinates?: number[];
 };
+raw?:{
+  lensFirst?:{
+    image?:string[];
+  }
+}
 }
 
 type PlaceLeanMinimal = {
@@ -3118,14 +3127,120 @@ private readonly openaiModel = 'gpt-4.1-mini'; // or 'gpt-4.1', etc.
 
 
 
-public async searchNominatim(
+// public async searchNominatim(
+//   entityName: string,
+//   userLat?: number,
+//   userLon?: number
+// ): Promise<GeoResult | null> {
+//   const userAgent = 'MyLandmarkApp/1.0 (contact@myapp.com)'; // TODO: put real app/contact
+//   const query = encodeURIComponent(entityName.trim());
+//   const deltaDeg = 1; // 1° ≈ 111km
+
+//   const hasUserLocation =
+//     typeof userLat === 'number' &&
+//     !isNaN(userLat) &&
+//     typeof userLon === 'number' &&
+//     !isNaN(userLon);
+
+//   const buildUrl = (bounded: boolean): string => {
+//     let url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`;
+//     if (bounded && hasUserLocation) {
+//       // viewbox=left,top,right,bottom = lon_min,lat_max,lon_max,lat_min
+//       const left = userLon! - deltaDeg;
+//       const right = userLon! + deltaDeg;
+//       const top = userLat! + deltaDeg;
+//       const bottom = userLat! - deltaDeg;
+//       url += `&viewbox=${left},${top},${right},${bottom}&bounded=1`;
+//     }
+//     return url;
+//   };
+
+//   const tryOnce = async (bounded: boolean): Promise<GeoResult | null> => {
+//     const url = buildUrl(bounded);
+//     try {
+//       const resp = await fetch(url, {
+//         method: 'GET',
+//         headers: { 'User-Agent': userAgent },
+//       });
+
+//       if (!resp.ok) {
+//         const text = await resp.text().catch(() => '');
+//         console.error(
+//           `Nominatim error for '${entityName}' (bounded=${bounded}):`,
+//           resp.status,
+//           text.slice(0, 200),
+//         );
+//         return null;
+//       }
+
+//       const places = (await resp.json()) as any[];
+//       const place = places?.[0];
+//       if (place?.lat && place?.lon) {
+//         return {
+//           lat: parseFloat(place.lat),
+//           lon: parseFloat(place.lon),
+//         };
+//       }
+
+//       console.log(
+//         `Nominatim: no results for '${entityName}' (bounded=${bounded})`
+//       );
+//       return null;
+//     } catch (e) {
+//       console.error(
+//         `Nominatim request failed for '${entityName}' (bounded=${bounded})`,
+//         e,
+//       );
+//       return null;
+//     }
+//   };
+
+//   // 1) Try near user first (if we have user location)
+//   if (hasUserLocation) {
+//     const local = await tryOnce(true);
+//     if (local) return local;
+//   }
+
+//   // 2) Fallback: global search
+//   const global = await tryOnce(false);
+//   if (global) return global;
+
+//   // 3) Nothing found
+//   return null;
+// }
+
+
+
+
+// vision.service.ts (or wherever this lives)
+
+
+private readonly EARTH_R = 6371000;
+
+ private haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const toRad = (v: number) => (v * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * this.EARTH_R * Math.asin(Math.sqrt(a));
+  }
+
+public async searchGoogleGeocoding(
   entityName: string,
   userLat?: number,
-  userLon?: number
+  userLon?: number,
 ): Promise<GeoResult | null> {
-  const userAgent = 'MyLandmarkApp/1.0 (contact@myapp.com)'; // TODO: put real app/contact
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    console.error('GOOGLE_MAPS_API_KEY is not set; skipping Google Geocoding');
+    return null;
+  }
+
   const query = encodeURIComponent(entityName.trim());
-  const deltaDeg = 1; // 1° ≈ 111km
+  const deltaDeg = 0.09;             // ~10km bbox for biasing
+  const NEAR_RADIUS_M = 1_000;       // 1km radius
 
   const hasUserLocation =
     typeof userLat === 'number' &&
@@ -3134,52 +3249,76 @@ public async searchNominatim(
     !isNaN(userLon);
 
   const buildUrl = (bounded: boolean): string => {
-    let url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`;
+    let url =
+      `https://maps.googleapis.com/maps/api/geocode/json` +
+      `?address=${query}&key=${apiKey}`;
+
     if (bounded && hasUserLocation) {
-      // viewbox=left,top,right,bottom = lon_min,lat_max,lon_max,lat_min
-      const left = userLon! - deltaDeg;
-      const right = userLon! + deltaDeg;
-      const top = userLat! + deltaDeg;
-      const bottom = userLat! - deltaDeg;
-      url += `&viewbox=${left},${top},${right},${bottom}&bounded=1`;
+      const swLat = userLat! - deltaDeg;
+      const swLng = userLon! - deltaDeg;
+      const neLat = userLat! + deltaDeg;
+      const neLng = userLon! + deltaDeg;
+      url += `&bounds=${swLat},${swLng}|${neLat},${neLng}`;
     }
+
     return url;
   };
 
   const tryOnce = async (bounded: boolean): Promise<GeoResult | null> => {
     const url = buildUrl(bounded);
-    try {
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: { 'User-Agent': userAgent },
-      });
 
+    try {
+      const resp = await fetch(url);
       if (!resp.ok) {
         const text = await resp.text().catch(() => '');
         console.error(
-          `Nominatim error for '${entityName}' (bounded=${bounded}):`,
+          `Google Geocoding error for '${entityName}' (bounded=${bounded}):`,
           resp.status,
           text.slice(0, 200),
         );
         return null;
       }
 
-      const places = (await resp.json()) as any[];
-      const place = places?.[0];
-      if (place?.lat && place?.lon) {
-        return {
-          lat: parseFloat(place.lat),
-          lon: parseFloat(place.lon),
-        };
+      const data = (await resp.json()) as any;
+
+      if (data.status !== 'OK' || !data.results?.length) {
+        console.log(
+          `Google Geocoding: no results for '${entityName}' (bounded=${bounded}), status=${data.status}`,
+        );
+        return null;
       }
 
-      console.log(
-        `Nominatim: no results for '${entityName}' (bounded=${bounded})`
-      );
-      return null;
+      const first = data.results[0];
+      const loc = first.geometry?.location;
+      if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') {
+        console.log(
+          `Google Geocoding: invalid geometry for '${entityName}' (bounded=${bounded})`,
+        );
+        return null;
+      }
+
+      const lat = loc.lat;
+      const lon = loc.lng;
+
+      // 1 km radius check
+      if (hasUserLocation) {
+        const dist = this.haversine(userLat!, userLon!, lat, lon);
+        console.log(
+          `Google Geocoding: '${entityName}' is ${Math.round(dist)}m from user`,
+        );
+        if (dist > NEAR_RADIUS_M) {
+          console.log(
+            `Google Geocoding: '${entityName}' is outside 1km radius; discarding`,
+          );
+          return null;
+        }
+      }
+
+      // If we reach here: either no user location OR within 1km
+      return { lat, lon };
     } catch (e) {
       console.error(
-        `Nominatim request failed for '${entityName}' (bounded=${bounded})`,
+        `Google Geocoding request failed for '${entityName}' (bounded=${bounded})`,
         e,
       );
       return null;
@@ -3192,14 +3331,12 @@ public async searchNominatim(
     if (local) return local;
   }
 
-  // 2) Fallback: global search
+  // 2) Fallback: global search (but still 1km filter will apply if userLoc exists)
   const global = await tryOnce(false);
   if (global) return global;
 
-  // 3) Nothing found
   return null;
 }
-
 
 
 
@@ -3220,29 +3357,103 @@ public async getBuildingInfoFromChatGPT(
 
   console.log("here reach", buildingName)
 
-  const prompt = `
-You are an expert travel writer and architectural historian.
-Given the name of a building, output ONLY a JSON object with these fields:
+//   const prompt = `
+// You are an expert travel writer and architectural historian.
+// Given the name of a building, output ONLY a JSON object with these fields:
+
+// {
+//   "name": string,
+//   "shortDescription": string,          // 3–5 sentences, general overview
+//   "tourismDescription": string,       // 4–8 sentences, from tourist perspective
+//   "funFacts": string[],               // list of short fun/interesting facts
+//   "heightMeters": number | null,      // height in meters if known, else null
+//   "latitude": number | null,          // decimal degrees if known, else null
+//   "longitude": number | null,         // decimal degrees if known, else null
+//   "architectureStyle": string | null  // e.g. "Gothic Revival"; null if unknown
+//   "architectName": string | null  // e.g. "Minoru Yamasaki"; null if unknown
+//   "location": string | null  // e.g. "Newyork"; null if unknown
+// }
+
+// Rules:
+// - If a value is unknown, use null for numbers and "" for strings, [] for funFacts.
+// - Do not add extra fields.
+// - Do not write anything before or after the JSON.
+
+// Building name: "${buildingName}"
+// `.trim();
+
+
+const prompt = `
+You are an expert travel writer and architectural historian who writes in a tourism‑focused, fun, and engaging tone aimed at visitors. 
+Always highlight:
+- Why the place is interesting
+- What visitors can do nearby
+
+The input "buildingName" may be a messy search or listing title from things like Google Lens, visual search, or real‑estate websites. 
+It can include unit numbers, neighborhoods, websites, or event titles. 
+Your first job is to figure out the *actual building name* from this messy text.
+
+CLEANING / NORMALIZING THE BUILDING NAME
+
+From the raw input, infer a clean, canonical building name:
+
+Rules:
+1. If there is a distinct building name followed by an address or neighborhood, use the building name.
+   - "Sycamore at 250 East 30th Street in Kips Bay : Sales, Rentals ..."  
+     → "Sycamore"
+   - "Kips Bay Towers at 343 E 30th St - Manhattan, NY | Compass"  
+     → "Kips Bay Towers"
+
+2. If there is no special building name, use the street address *without* unit/apartment numbers.
+   - "330 East 38th Street #32G in Murray Hill, Manhattan | StreetEasy"  
+     → "330 East 38th Street"
+   - "251 East 32nd Street #4J in Kips Bay, Manhattan | StreetEasy"  
+     → "251 East 32nd Street"
+   - "200 East 32nd Street #9A in Kips Bay, Manhattan | StreetEasy"  
+     → "200 East 32nd Street"
+
+3. If the text is about a famous building plus an event, keep only the building name.
+   - "The Empire State Building Holiday Light Show will be on view ..."  
+     → "Empire State Building"
+
+4. Strip out:
+   - Unit numbers (e.g. "#32G", "#4J", "#9A")
+   - Website or marketplace names (e.g. "StreetEasy", "Compass")
+   - Marketing text (e.g. "Sales, Rentals", "For Rent", "For Sale")
+   - Extra punctuation and separators (e.g. "|", ":", "-")
+
+5. Do *not* include the city/neighborhood in the "name" field unless it is truly part of the official building name.
+
+6. If you genuinely cannot find any proper building name, default to the cleaned street address.
+
+Use this cleaned result as the building's "name" in the JSON below.
+
+OUTPUT FORMAT
+
+Given the raw building text, output ONLY a JSON object with these fields:
 
 {
   "name": string,
-  "shortDescription": string,          // 3–5 sentences, general overview
-  "tourismDescription": string,       // 4–8 sentences, from tourist perspective
-  "funFacts": string[],               // list of short fun/interesting facts
+  "shortDescription": string,          // 3–5 engaging sentences, general overview, why it’s interesting
+  "tourismDescription": string,       // 4–8 fun, visitor-focused sentences: what to see, do, and experience nearby
+  "funFacts": string[],               // list of short, punchy fun/interesting facts
   "heightMeters": number | null,      // height in meters if known, else null
   "latitude": number | null,          // decimal degrees if known, else null
   "longitude": number | null,         // decimal degrees if known, else null
-  "architectureStyle": string | null  // e.g. "Gothic Revival"; null if unknown
-  "architectName": string | null  // e.g. "Minoru Yamasaki"; null if unknown
-  "location": string | null  // e.g. "Newyork"; null if unknown
+  "architectureStyle": string | null, // e.g. "Gothic Revival"; null if unknown
+  "architectName": string | null,     // e.g. "Minoru Yamasaki"; null if unknown
+  "location": string | null           // e.g. "Kips Bay, Manhattan, New York City"; null if unknown
 }
 
 Rules:
-- If a value is unknown, use null for numbers and "" for strings, [] for funFacts.
+- Use a fun, welcoming tone for tourists and casual visitors.
+- Clearly convey why the place is worth seeing and what people can do nearby.
+- The "name" field must use the cleaned building name, not the raw noisy input.
+- If a value is unknown, use null for numbers, "" for strings, [] for funFacts.
 - Do not add extra fields.
 - Do not write anything before or after the JSON.
 
-Building name: "${buildingName}"
+Raw building text (may be noisy): "${buildingName}"
 `.trim();
 
   try {
@@ -3346,7 +3557,7 @@ async findPlaceDetailSerp(PlaceName: string) {
     // preferred images for UI
     thumbnailImage,
     // originalImage,
-
+    originalImage: getDetail.raw.lensFirst.image,
     // description
     description,
 
@@ -3379,7 +3590,11 @@ async findPlaceDetailSerp(PlaceName: string) {
 
 // In VisionService
 async getScansDetailsSerp(id: string) {
+
+
   try {
+
+    console.log("hrll", id, "type of", typeof(id))
     const place = await this.placeModel
       .findById(id)
       .lean<PlaceResponseSerp>(); // keep your type here
@@ -3403,6 +3618,7 @@ async getScansDetailsSerp(id: string) {
       wikipediaThumbImage: place.images?.thumbnail,
       // wikipediaOriginalImage: place.images?.original,
       thumbnailImage: place.images?.local_thumbnail || place.images?.thumbnail,
+      originalImage: place.raw.lensFirst.image,
       // originalImage: place.images?.local_original || place.images?.original,
 
       description:          // matches your place object
