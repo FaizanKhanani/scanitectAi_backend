@@ -19,7 +19,7 @@ import { HttpExceptionFilter } from "../utils/http-exception.filter";
 import { FetchDataFromWikipedia } from "./dto/fetchDataFromWikipedia.dto";
 // import { FetchDataFromChatGpt } from "./dto/fetchDataFromChatGpt.dto";
 import { memoryStorage } from 'multer';
-import { ImageClassifierService } from '../ImageClassifier/image-classifier.service';
+// import { ImageClassifierService } from '../ImageClassifier/image-classifier.service';
 import type { Response ,Express } from 'express';
 import axios from 'axios';
 import { Public } from '../common/decorators';
@@ -51,7 +51,7 @@ export class VisionController {
     private readonly visionService: VisionService,
     private readonly userService: UserService,
     private readonly translationService: TranslationService,
-      private readonly imageClassifier: ImageClassifierService,
+      // private readonly imageClassifier: ImageClassifierService,
   ) {}
 
 
