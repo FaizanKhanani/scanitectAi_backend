@@ -679,14 +679,14 @@ async recognizeWithLenss(
   const latRaw = get('lat');
   const lonRaw = get('lon');
 
-    const userLat = 40.71108272238126
-  const userLon = -74.00555894721657
+  //   const userLat = 40.71108272238126
+  // const userLon = -74.00555894721657
 
 
-  // const userLat =
-  //   latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
-  // const userLon =
-  //   lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
+  const userLat =
+    latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
+  const userLon =
+    lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
 
 
   if (
