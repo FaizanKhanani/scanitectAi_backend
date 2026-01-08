@@ -413,6 +413,9 @@ export class VisionController {
 
 
 
+
+
+
 // @Post('lens')
 // @UseGuards(AuthGuard)
 // @UseFilters(new HttpExceptionFilter())
@@ -444,13 +447,15 @@ export class VisionController {
 //   const latRaw = get('lat');
 //   const lonRaw = get('lon');
 
+//   //   const userLat = 40.74547599095041
+//   // const userLon = -73.97540709324299
+
+ 
 //   const userLat =
 //     latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
 //   const userLon =
 //     lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
 
-//   //  const userLat = 40.743474550126685;
-//   // const userLon = -73.97498397090854;
 
 //   if (
 //     (latRaw !== undefined && Number.isNaN(userLat)) ||
@@ -484,729 +489,6 @@ export class VisionController {
 
 //   try {
 //     // 2) Google Lens via SerpApi
-//     const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
-
-//     if (lensResult.lowConfidence || !lensResult.first) {
-//       return res.status(400).json({
-//         status: 400,
-//         message: 'LOW_CONFIDENCE',
-//         data:
-//           'Please try again and take a clearer photo from a different angle.',
-//       });
-//     }
-
-//     const first = lensResult.first;
-
-//     // 3) Derive canonical place name
-//     const placeName: string =
-//       lensResult.label ||
-//       lensResult.raw?.knowledge_graph?.title ||
-//       lensResult.raw?.knowledge_graph?.name ||
-//       lensResult.raw?.related_content?.[0]?.query ||
-//       first.title ||
-//       first.name ||
-//       first.link_title ||
-//       first.query ||
-//       'Unknown building';
-
-//     // 4) Existing place in DB? -> check area, then return
-//     const existing = await this.visionService.findPlaceDetailSerp(placeName);
-//     if (existing) {
-//       // existing is a flattened DTO, so latitude/longitude likely live in aiLatitude/aiLongitude
-//       const existingAny = existing as any;
-
-//       const existingLat =
-//         existingAny.aiLatitude ??
-//         existingAny.latitude ??
-//         existingAny.ai?.latitude ??
-//         existingAny.coordinates?.coordinates?.[1];
-
-//       const existingLon =
-//         existingAny.aiLongitude ??
-//         existingAny.longitude ??
-//         existingAny.ai?.longitude ??
-//         existingAny.coordinates?.coordinates?.[0];
-
-//       if (
-//         userLat != null &&
-//         userLon != null &&
-//         existingLat != null &&
-//         existingLon != null
-//       ) {
-//         const distKm = this.visionService.distanceKm(
-//           userLat,
-//           userLon,
-//           Number(existingLat),
-//           Number(existingLon),
-//         );
-
-//         const MAX_DISTANCE_KM = 50; // tune as needed
-
-//         if (distKm > MAX_DISTANCE_KM) {
-//           return res.status(400).json({
-//             status: 400,
-//             message: 'LOCATION_MISMATCH',
-//             data:
-//               'You are out of zone. Please come in 50KM radius',
-//           });
-//         }
-//       }
-
-//       await this.userService.addScanIdInUser(userId, existing.id);
-//       return res.status(200).json({
-//         status: 200,
-//         message: 'success',
-//         data: existing,
-//       });
-//     }
-
-//     // 5) No existing place -> call ChatGPT
-//     const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
-//     console.log('the gpt data', gpt);
-
-//     // 6) Area restriction vs GPT coordinates
-//     if (
-//       userLat != null &&
-//       userLon != null &&
-//       gpt?.latitude != null &&
-//       gpt?.longitude != null
-//     ) {
-//       const distKm = this.visionService.distanceKm(
-//         userLat,
-//         userLon,
-//         Number(gpt.latitude),
-//         Number(gpt.longitude),
-//       );
-
-//       const MAX_DISTANCE_KM = 50; // tune as needed
-
-//       if (distKm > MAX_DISTANCE_KM) {
-//         return res.status(400).json({
-//           status: 400,
-//           message: 'LOCATION_MISMATCH',
-//           data:
-//            'You are out of zone. Please come in 50KM radius',
-//         });
-//       }
-//     }
-
-//     // 7) Upsert place in DB
-//     const placeDoc = await this.visionService.upsertPlaceFromLens({
-//       first,
-//       imageUrl: lensResult.imageUrl,
-//       gpt,
-//     });
-
-//     // 8) Attach place id to user
-//     await this.userService.addScanIdInUser(userId, String(placeDoc._id));
-
-//     // 9) Response: use AI title as main title
-//     const displayTitle = placeDoc.ai?.title || placeDoc.title;
-
-//     const responseData = {
-//       id: placeDoc._id,
-//       title: displayTitle,                     // AI title for frontend
-//       thumbnailImage: placeDoc.images?.thumbnail,
-//       originalImage: placeDoc.images?.original,
-//       chatgptTitle: placeDoc.ai?.title,
-//       shortDescription: placeDoc.ai?.shortDescription,
-//       tourismDescription: placeDoc.ai?.tourismDescription,
-//       funFacts: placeDoc.ai?.funFacts,
-//       heightMeters: placeDoc.ai?.heightMeters,
-//       latitude: placeDoc.ai?.latitude,
-//       longitude: placeDoc.ai?.longitude,
-//       architectureStyle: placeDoc.ai?.architectureStyle,
-//         architectName: placeDoc.ai?.architectName,  // <-- NEW
-//   location: placeDoc.ai?.location, 
-//     };
-
-//     console.log('the response', responseData);
-
-//     return res.status(200).json({
-//       status: 200,
-//       message: 'success',
-//       data: responseData,
-//     });
-//   } catch (e: any) {
-//     console.error('[Lens] error:', e?.message || e);
-//     return res.status(400).json({
-//       status: 400,
-//       message: 'FAILURE',
-//       data: e?.message || 'Google Lens lookup failed',
-//     });
-//   }
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-@Post('lens')
-@UseGuards(AuthGuard)
-@UseFilters(new HttpExceptionFilter())
-@UseInterceptors(
-  FileFieldsInterceptor(
-    [
-      { name: 'image', maxCount: 1 },
-      { name: 'file',  maxCount: 1 },
-    ],
-    {
-      storage: memoryStorage(),
-      limits: { fileSize: 10 * 1024 * 1024 },
-    },
-  ),
-)
-async recognizeWithLenss(
-  @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
-  @Body() body: RecognizeDto,
-  @Query() query: RecognizeDto,
-  @Req() req,
-  @Res() res: Response,
-) {
-  const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
-  const userId = req.user?.sub;
-
-  console.log('the body', body);
-
-  // --- parse user location from frontend: lat, lon ---
-  const latRaw = get('lat');
-  const lonRaw = get('lon');
-
-  //   const userLat = 40.71108272238126
-  // const userLon = -74.00555894721657
-
-
-  const userLat =
-    latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
-  const userLon =
-    lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
-
-
-  if (
-    (latRaw !== undefined && Number.isNaN(userLat)) ||
-    (lonRaw !== undefined && Number.isNaN(userLon))
-  ) {
-    throw new BadRequestException('Invalid lat or lon');
-  }
-
-  // 1) Build image buffer
-  let buf: Buffer | undefined;
-  const up = files?.image?.[0] ?? files?.file?.[0];
-
-  if (up?.buffer) {
-    buf = up.buffer;
-  } else if (get('image_base64')) {
-    buf = Buffer.from(get('image_base64') as string, 'base64');
-  } else if (get('image_url')) {
-    const url = get('image_url') as string;
-    const resp = await axios.get<ArrayBuffer>(url, {
-      responseType: 'arraybuffer',
-      timeout: 35000,
-    });
-    buf = Buffer.from(resp.data as any);
-  }
-
-  if (!buf) {
-    throw new BadRequestException(
-      "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
-    );
-  }
-
-  try {
-    // 2) Google Lens via SerpApi
-    const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
-
-    // Only treat as failure if there is NO visual match at all
-    if (!lensResult.first) {
-      let nearbyPlaces: any[] = [];
-
-      // If we have user location, fetch nearby famous places within 3 km
-      if (userLat != null && userLon != null) {
-        try {
-          nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
-            userLat,
-            userLon,
-            3000, // 3km radius in meters
-          );
-        } catch (err) {
-          console.error('[Lens] nearbyPlaces error:', err);
-        }
-      }
-
-      return res.status(400).json({
-        status: 400,
-        message: 'LOW_CONFIDENCE',
-        data: {
-          reason:
-            'We could not confidently recognize this building. ' +
-            'Please try again and take a clearer photo from a different angle.',
-          nearbyPlaces,
-        },
-      });
-    }
-
-    const first = lensResult.first;
-
-    // 3) Derive canonical place name
-    const placeName: string =
-      lensResult.label ||
-      lensResult.raw?.knowledge_graph?.title ||
-      lensResult.raw?.knowledge_graph?.name ||
-      lensResult.raw?.related_content?.[0]?.query ||
-      first.title ||
-      first.name ||
-      first.link_title ||
-      first.query ||
-      'Unknown building';
-
-    // distance thresholds (km)
-    const STRICT_MAX_KM = 1;   // must be within 1km of user to trust match
-    const ZONE_MAX_KM   = 30;  // allowed zone radius
-
-    // 4) Existing place in DB? -> check area restriction, then return
-    const existing = await this.visionService.findPlaceDetailSerp(placeName);
-    if (existing) {
-      const existingAny = existing as any;
-
-      const existingLat =
-        existingAny.aiLatitude ??
-        existingAny.latitude ??
-        existingAny.ai?.latitude ??
-        existingAny.coordinates?.coordinates?.[1];
-
-      const existingLon =
-        existingAny.aiLongitude ??
-        existingAny.longitude ??
-        existingAny.ai?.longitude ??
-         existingAny.coordinates?.coordinates?.[0];
-
-      if (
-        userLat != null &&
-        userLon != null &&
-        existingLat != null &&
-        existingLon != null
-      ) {
-        const distKm = this.visionService.distanceKm(
-          userLat,
-          userLon,
-          Number(existingLat),
-          Number(existingLon),
-        );
-
-        if (distKm > ZONE_MAX_KM) {
-          return res.status(400).json({
-            status: 400,
-            message: 'LOCATION_MISMATCH',
-            data: 'You are out of zone. Please come in 50KM radius',
-          });
-        }
-      }
-
-      await this.userService.addScanIdInUser(userId, existing.id);
-      return res.status(200).json({
-        status: 200,
-        message: 'success',
-        data: existing,
-      });
-    }
-
-    // 5) No existing place -> call ChatGPT
-
-const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
-console.log('the gpt data', gpt);
-
-// 6) Use OSM (first) or GPT coords + user location to decide confidence / zone
-if (userLat != null && userLon != null) {
-  let targetLat: number | null = null;
-  let targetLon: number | null = null;
-  let coordSource: 'osm' | 'gpt' | null = null;
-
-  // 1) Try OSM / Nominatim first
-try {
-  const googleResult = await this.visionService.searchGoogleGeocoding(
-    placeName,
-    userLat,
-    userLon,
-  );
-
-  if (googleResult) {
-    // Place is within 1km radius of user
-    targetLat = googleResult.lat;
-    targetLon = googleResult.lon;
-    console.log('Using Google coords within 1km:', googleResult);
-  } else {
-    // Either not found OR farther than 1km
-    console.log(
-      'Place not found within 1km of user (or geocoding failed):',
-      placeName,
-    );
-  }
-} catch (e) {
-  console.error('Error while calling Google Geocoding:', e);
-}
-
-  // 2) If OSM did NOT give coords, fallback to GPT coords
-  if (targetLat == null || targetLon == null) {
-    const gptLat =
-      gpt?.latitude != null ? Number(gpt.latitude) : NaN;
-    const gptLon =
-      gpt?.longitude != null ? Number(gpt.longitude) : NaN;
-
-    if (!Number.isNaN(gptLat) && !Number.isNaN(gptLon)) {
-      targetLat = gptLat;
-      targetLon = gptLon;
-      coordSource = 'gpt';
-      console.log('Using GPT coordinates:', { lat: gptLat, lon: gptLon });
-    }
-  }
-
-  // 3) If still no coordinates from OSM or GPT -> LOW_CONFIDENCE + nearbyPlaces
-  if (targetLat == null || targetLon == null) {
-    let nearbyPlaces: any[] = [];
-    try {
-      nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
-        userLat,
-        userLon,
-        3000, // 3km radius
-      );
-    } catch (err) {
-      console.error(
-        '[Lens] nearbyPlaces error (no coords from OSM or GPT):',
-        err,
-      );
-    }
-
-    return res.status(400).json({
-      status: 400,
-      message: 'LOW_CONFIDENCE',
-      data: {
-        reason:
-          'We could not confidently recognize this building (no reliable location found). ' +
-          'Please try again and take a clearer photo from a different angle.',
-        nearbyPlaces,
-      },
-    });
-  }
-
-  // 4) We have coordinates (from OSM or GPT) -> compute distance
-  const distKm = this.visionService.distanceKm(
-    userLat,
-    userLon,
-    targetLat,
-    targetLon,
-  );
-  console.log(`Distance from user (${coordSource}):`, distKm, 'km');
-
-  // B1: way outside general zone -> LOCATION_MISMATCH (you treat as LOW_CONFIDENCE)
-  if (distKm > ZONE_MAX_KM) {
-    let nearbyPlaces: any[] = [];
-    try {
-      nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
-        userLat,
-        userLon,
-        3000, // 3km radius
-      );
-    } catch (err) {
-      console.error('[Lens] nearbyPlaces error (zone mismatch):', err);
-    }
-
-    return res.status(400).json({
-      status: 400,
-      message: 'LOW_CONFIDENCE',
-      data: {
-        reason:
-          'We could not confidently match this building within your location. ' +
-          'Please try again and take a clearer photo from a different angle.',
-        nearbyPlaces,
-      },
-    });
-  }
-
-  // B2: inside zone but > 3km -> LOW_CONFIDENCE + nearbyPlaces
-  if (distKm > STRICT_MAX_KM) {
-    let nearbyPlaces: any[] = [];
-    try {
-      nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
-        userLat,
-        userLon,
-        3000, // 3km radius
-      );
-    } catch (err) {
-      console.error('[Lens] nearbyPlaces error (strict radius):', err);
-    }
-
-    return res.status(400).json({
-      status: 400,
-      message: 'LOW_CONFIDENCE',
-      data: {
-        reason:
-          'We could not confidently match this building within 3km of your location. ' +
-          'Please try again and take a clearer photo from a different angle.',
-        nearbyPlaces,
-      },
-    });
-  }
-
-  // If you reach here: distKm <= STRICT_MAX_KM -> HIGH_CONFIDENCE / success logic below...
-  // e.g. return recognized building, etc.
-}
-
-
-
-
-
-//     const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
-//     console.log('the gpt data', gpt);
-
-//     // 6) Use GPT coords + user location to decide confidence / zone
-//     if (userLat != null && userLon != null) {
-     
-//       // Case A: GPT has NO coordinates at all -> LOW_CONFIDENCE + nearbyPlaces
-//       if (gpt?.latitude == null || gpt?.longitude == null) {
-
-
-
-//         let nearbyPlaces: any[] = [];
-//         try {
-//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
-//             userLat,
-//             userLon,
-//                3000, // 3km radius in meters
-//           );
-//         } catch (err) {
-//           console.error('[Lens/GPT] nearbyPlaces error (no coords):', err);
-//         }
-
-//         return res.status(400).json({
-//           status: 400,
-//           message: 'LOW_CONFIDENCE',
-//           data: {
-//             reason:
-//               'We could not confidently recognize this building (no reliable location found). ' +
-//               'Please try again and take a clearer photo from a different angle.',
-//             nearbyPlaces,
-//           },
-//         });
-//       }
-
-//       // Case B: GPT has coordinates -> compute distance
-//       const distKm = this.visionService.distanceKm(
-//         userLat,
-//         userLon,
-//         Number(gpt.latitude),
-//         Number(gpt.longitude),
-//       );
-
-//       // B1: way outside general zone -> LOCATION_MISMATCH (hard fail)
-//       if (distKm > ZONE_MAX_KM) {
-
-//  let nearbyPlaces: any[] = [];
-//         try {
-//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
-//             userLat,
-//             userLon,
-//               3000, // 3km radius in meters
-//           );
-//         } catch (err) {
-//           console.error('[Lens/GPT] nearbyPlaces error (no coords):', err);
-//         }
-
-//         // return res.status(400).json({
-//         //   status: 400,
-//         //   message: 'LOCATION_MISMATCH',
-//         //   data: 'You are out of zone. Please come in 50KM radius',
-//         // });
-
-        
-//         return res.status(400).json({
-//           status: 400,
-//           message: 'LOW_CONFIDENCE',
-//           data: {
-//             reason:
-//               'We could not confidently match this building within your location. ' +
-//               'Please try again and take a clearer photo from a different angle.',
-//             nearbyPlaces,
-//           },
-//         });
-//       }
-
-//       // B2: inside zone but > 3km -> LOW_CONFIDENCE + nearbyPlaces
-//       if (distKm > STRICT_MAX_KM) {
-//         let nearbyPlaces: any[] = [];
-//         try {
-//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
-//             userLat,
-//             userLon,
-//                3000, // 3km radius in meters
-//           );
-//         } catch (err) {
-//           console.error('[Lens/GPT] nearbyPlaces error (strict):', err);
-//         }
-
-//         return res.status(400).json({
-//           status: 400,
-//           message: 'LOW_CONFIDENCE',
-//           data: {
-//             reason:
-//               'We could not confidently match this building within 3km of your location. ' +
-//               'Please try again and take a clearer photo from a different angle.',
-//             nearbyPlaces,
-//           },
-//         });
-//       }
-//     }
-
-    // 7) Upsert place in DB
-    const placeDoc = await this.visionService.upsertPlaceFromLens({
-      first,
-      imageUrl: lensResult.imageUrl,
-      gpt,
-    });
-
-    // 8) Attach place id to user
-    await this.userService.addScanIdInUser(userId, String(placeDoc._id));
-
-    // 9) Response: use AI title as main title
-    const displayTitle = placeDoc.ai?.title || placeDoc.title;
-
-    const responseData = {
-      id: placeDoc._id,
-      title: displayTitle,
-      thumbnailImage: placeDoc.images?.thumbnail,
-      originalImage: placeDoc.images?.original,
-      chatgptTitle: placeDoc.ai?.title,
-      shortDescription: placeDoc.ai?.shortDescription,
-      tourismDescription: placeDoc.ai?.tourismDescription,
-      funFacts: placeDoc.ai?.funFacts,
-      heightMeters: placeDoc.ai?.heightMeters,
-      latitude: placeDoc.ai?.latitude,
-      longitude: placeDoc.ai?.longitude,
-      architectureStyle: placeDoc.ai?.architectureStyle,
-      architectName: placeDoc.ai?.architectName,
-      location: placeDoc.ai?.location,
-    };
-
-    console.log('the response', responseData);
-
-    return res.status(200).json({
-      status: 200,
-      message: 'success',
-      data: responseData,
-    });
-  } catch (e: any) {
-    console.error('[Lens] error:', e?.message || e);
-    return res.status(400).json({
-      status: 400,
-      message: 'FAILURE',
-      data: e?.message || 'Google Lens lookup failed',
-    });
-  }
-}
-
-
-
-
-
-
-
-// @Post('lens')
-// @UseGuards(AuthGuard)
-// @UseFilters(new HttpExceptionFilter())
-// @UseInterceptors(
-//   FileFieldsInterceptor(
-//     [
-//       { name: 'image', maxCount: 1 },
-//       { name: 'file',  maxCount: 1 },
-//     ],
-//     {
-//       storage: memoryStorage(),
-//       limits: { fileSize: 10 * 1024 * 1024 },
-//     },
-//   ),
-// )
-// async recognizeWithLenss(
-//   @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
-//   @Body() body: RecognizeDto,
-//   @Query() query: RecognizeDto,
-//   @Req() req,
-//   @Res() res: Response,
-// ) {
-//   const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
-//   const userId = req.user?.sub;
-
-//   console.log('the body', body);
-
-//   // --- parse user location from frontend: lat, lon ---
-//   const latRaw = get('lat');
-//   const lonRaw = get('lon');
-
-//   //   const userLat = 40.75144488723498
-//   // const userLon = -73.99181394960962
-
-//   const userLat =
-//     latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
-//   const userLon =
-//     lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
-
-
-//   if (
-//     (latRaw !== undefined && Number.isNaN(userLat)) ||
-//     (lonRaw !== undefined && Number.isNaN(userLon))
-//   ) {
-//     throw new BadRequestException('Invalid lat or lon');
-//   }
-
-//   // 1) Build image buffer
-//   let buf: Buffer | undefined;
-//   const up = files?.image?.[0] ?? files?.file?.[0];
-
-//   if (up?.buffer) {
-//     buf = up.buffer;
-//   } else if (get('image_base64')) {
-//     buf = Buffer.from(get('image_base64') as string, 'base64');
-//   } else if (get('image_url')) {
-//     const url = get('image_url') as string;
-//     const resp = await axios.get<ArrayBuffer>(url, {
-//       responseType: 'arraybuffer',
-//       timeout: 35000,
-//     });
-//     buf = Buffer.from(resp.data as any);
-//   }
-
-//   if (!buf) {
-//     throw new BadRequestException(
-//       "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
-//     );
-//   }
-
-//   try {
-//     // 1.5) First: check with ONNX model if this is a building/landmark
-
-//     console.log("here in this ")
-//     const predictions = await this.imageClassifier.classifyImage(buf, 5);
-//     console.log("the predicction", predictions)
-//     const isBuilding = this.imageClassifier.isBuildingOrLandmark(predictions);
-
-//     if (!isBuilding) {
-//       return res.status(400).json({
-//         status: 400,
-//         message: 'NOT_A_BUILDING',
-//         data: {
-//           reason: 'This photo does not look like a building or landmark.',
-//           predictions, // optional: can remove in production
-//         },
-//       });
-//     }
-
-
-//     // 2) Google Lens via SerpApi (only if it passed the building check)
 //     const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
 
 //     // Only treat as failure if there is NO visual match at all
@@ -1315,19 +597,28 @@ try {
 //   let coordSource: 'osm' | 'gpt' | null = null;
 
 //   // 1) Try OSM / Nominatim first
-//   try {
-//     const osmResult = await this.visionService.searchNominatim(placeName, userLat, userLon);
-//     if (osmResult) {
-//       targetLat = osmResult.lat;
-//       targetLon = osmResult.lon;
-//       coordSource = 'osm';
-//       console.log('Using OSM coordinates:', osmResult);
-//     } else {
-//       console.log('OSM could not find coordinates for', placeName);
-//     }
-//   } catch (e) {
-//     console.error('Error while calling Nominatim:', e);
+// try {
+//   const googleResult = await this.visionService.searchGoogleGeocoding(
+//     placeName,
+//     userLat,
+//     userLon,
+//   );
+
+//   if (googleResult) {
+//     // Place is within 1km radius of user
+//     targetLat = googleResult.lat;
+//     targetLon = googleResult.lon;
+//     console.log('Using Google coords within 1km:', googleResult);
+//   } else {
+//     // Either not found OR farther than 1km
+//     console.log(
+//       'Place not found within 1km of user (or geocoding failed):',
+//       placeName,
+//     );
 //   }
+// } catch (e) {
+//   console.error('Error while calling Google Geocoding:', e);
+// }
 
 //   // 2) If OSM did NOT give coords, fallback to GPT coords
 //   if (targetLat == null || targetLon == null) {
@@ -1431,11 +722,114 @@ try {
 //     });
 //   }
 
+//   // If you reach here: distKm <= STRICT_MAX_KM -> HIGH_CONFIDENCE / success logic below...
+//   // e.g. return recognized building, etc.
 // }
 
 
 
 
+
+// //     const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+// //     console.log('the gpt data', gpt);
+
+// //     // 6) Use GPT coords + user location to decide confidence / zone
+// //     if (userLat != null && userLon != null) {
+     
+// //       // Case A: GPT has NO coordinates at all -> LOW_CONFIDENCE + nearbyPlaces
+// //       if (gpt?.latitude == null || gpt?.longitude == null) {
+
+
+
+// //         let nearbyPlaces: any[] = [];
+// //         try {
+// //           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+// //             userLat,
+// //             userLon,
+// //                3000, // 3km radius in meters
+// //           );
+// //         } catch (err) {
+// //           console.error('[Lens/GPT] nearbyPlaces error (no coords):', err);
+// //         }
+
+// //         return res.status(400).json({
+// //           status: 400,
+// //           message: 'LOW_CONFIDENCE',
+// //           data: {
+// //             reason:
+// //               'We could not confidently recognize this building (no reliable location found). ' +
+// //               'Please try again and take a clearer photo from a different angle.',
+// //             nearbyPlaces,
+// //           },
+// //         });
+// //       }
+
+// //       // Case B: GPT has coordinates -> compute distance
+// //       const distKm = this.visionService.distanceKm(
+// //         userLat,
+// //         userLon,
+// //         Number(gpt.latitude),
+// //         Number(gpt.longitude),
+// //       );
+
+// //       // B1: way outside general zone -> LOCATION_MISMATCH (hard fail)
+// //       if (distKm > ZONE_MAX_KM) {
+
+// //  let nearbyPlaces: any[] = [];
+// //         try {
+// //           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+// //             userLat,
+// //             userLon,
+// //               3000, // 3km radius in meters
+// //           );
+// //         } catch (err) {
+// //           console.error('[Lens/GPT] nearbyPlaces error (no coords):', err);
+// //         }
+
+// //         // return res.status(400).json({
+// //         //   status: 400,
+// //         //   message: 'LOCATION_MISMATCH',
+// //         //   data: 'You are out of zone. Please come in 50KM radius',
+// //         // });
+
+        
+// //         return res.status(400).json({
+// //           status: 400,
+// //           message: 'LOW_CONFIDENCE',
+// //           data: {
+// //             reason:
+// //               'We could not confidently match this building within your location. ' +
+// //               'Please try again and take a clearer photo from a different angle.',
+// //             nearbyPlaces,
+// //           },
+// //         });
+// //       }
+
+// //       // B2: inside zone but > 3km -> LOW_CONFIDENCE + nearbyPlaces
+// //       if (distKm > STRICT_MAX_KM) {
+// //         let nearbyPlaces: any[] = [];
+// //         try {
+// //           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+// //             userLat,
+// //             userLon,
+// //                3000, // 3km radius in meters
+// //           );
+// //         } catch (err) {
+// //           console.error('[Lens/GPT] nearbyPlaces error (strict):', err);
+// //         }
+
+// //         return res.status(400).json({
+// //           status: 400,
+// //           message: 'LOW_CONFIDENCE',
+// //           data: {
+// //             reason:
+// //               'We could not confidently match this building within 3km of your location. ' +
+// //               'Please try again and take a clearer photo from a different angle.',
+// //             nearbyPlaces,
+// //           },
+// //         });
+// //       }
+// //     }
 
 //     // 7) Upsert place in DB
 //     const placeDoc = await this.visionService.upsertPlaceFromLens({
@@ -1483,6 +877,1858 @@ try {
 //     });
 //   }
 // }
+
+
+
+
+
+
+
+
+
+// controller.ts
+
+// @Post('lens')
+// @UseGuards(AuthGuard)
+// @UseFilters(new HttpExceptionFilter())
+// @UseInterceptors(
+//   FileFieldsInterceptor(
+//     [
+//       { name: 'image', maxCount: 1 },
+//       { name: 'file',  maxCount: 1 },
+//     ],
+//     {
+//       storage: memoryStorage(),
+//       limits: { fileSize: 10 * 1024 * 1024 },
+//     },
+//   ),
+// )
+// async recognizeWithLenss(
+//   @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
+//   @Body() body: RecognizeDto,
+//   @Query() query: RecognizeDto,
+//   @Req() req,
+//   @Res() res: Response,
+// ) {
+//   const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
+//   const userId = req.user?.sub;
+
+//   console.log('the body', body);
+
+//   // --- parse user location from frontend: lat, lon ---
+//   const latRaw = get('lat');
+//   const lonRaw = get('lon');
+
+//   const userLat =
+//     latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
+//   const userLon =
+//     lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
+
+//   if (
+//     (latRaw !== undefined && Number.isNaN(userLat)) ||
+//     (lonRaw !== undefined && Number.isNaN(userLon))
+//   ) {
+//     throw new BadRequestException('Invalid lat or lon');
+//   }
+
+//   // 1) Build image buffer
+//   let buf: Buffer | undefined;
+//   const up = files?.image?.[0] ?? files?.file?.[0];
+
+//   if (up?.buffer) {
+//     buf = up.buffer;
+//   } else if (get('image_base64')) {
+//     buf = Buffer.from(get('image_base64') as string, 'base64');
+//   } else if (get('image_url')) {
+//     const url = get('image_url') as string;
+//     const resp = await axios.get<ArrayBuffer>(url, {
+//       responseType: 'arraybuffer',
+//       timeout: 35000,
+//     });
+//     buf = Buffer.from(resp.data as any);
+//   }
+
+//   if (!buf) {
+//     throw new BadRequestException(
+//       "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
+//     );
+//   }
+
+//   try {
+//     // 2) Google Lens via SerpApi
+//     const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
+
+//     // Only treat as failure if there is NO visual match at all
+//     if (!lensResult.first) {
+//       let nearbyPlaces: any[] = [];
+
+//       // If we have user location, fetch nearby famous places within 3 km
+//       if (userLat != null && userLon != null) {
+//         try {
+//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+//             userLat,
+//             userLon,
+//             3000, // 3km radius in meters
+//           );
+//         } catch (err) {
+//           console.error('[Lens] nearbyPlaces error:', err);
+//         }
+//       }
+
+//       return res.status(400).json({
+//         status: 400,
+//         message: 'LOW_CONFIDENCE',
+//         data: {
+//           reason:
+//             'We could not confidently recognize this building. ' +
+//             'Please try again and take a clearer photo from a different angle.',
+//           nearbyPlaces,
+//         },
+//       });
+//     }
+
+//     const first = lensResult.first;
+
+//     // 3) Derive canonical place name from Lens result
+//     const placeName: string =
+//       lensResult.label ||
+//       lensResult.raw?.knowledge_graph?.title ||
+//       lensResult.raw?.knowledge_graph?.name ||
+//       lensResult.raw?.related_content?.[0]?.query ||
+//       first.title ||
+//       first.name ||
+//       first.link_title ||
+//       first.query ||
+//       'Unknown building';
+
+//     console.log('Derived placeName from Lens:', placeName);
+
+//     // distance thresholds (km)
+//     const STRICT_MAX_KM = 1;   // must be within 1km of user to trust match
+//     const ZONE_MAX_KM   = 30;  // allowed zone radius
+
+//     // 4) Existing place in DB? -> check area restriction, then return
+//     const existing = await this.visionService.findPlaceDetailSerp(placeName);
+//     if (existing) {
+//       const existingAny = existing as any;
+
+//       const existingLat =
+//         existingAny.aiLatitude ??
+//         existingAny.latitude ??
+//         existingAny.ai?.latitude ??
+//         existingAny.coordinates?.coordinates?.[1];
+
+//       const existingLon =
+//         existingAny.aiLongitude ??
+//         existingAny.longitude ??
+//         existingAny.ai?.longitude ??
+//         existingAny.coordinates?.coordinates?.[0];
+
+//       if (
+//         userLat != null &&
+//         userLon != null &&
+//         existingLat != null &&
+//         existingLon != null
+//       ) {
+//         const distKm = this.visionService.distanceKm(
+//           userLat,
+//           userLon,
+//           Number(existingLat),
+//           Number(existingLon),
+//         );
+
+//         if (distKm > ZONE_MAX_KM) {
+//           return res.status(400).json({
+//             status: 400,
+//             message: 'LOCATION_MISMATCH',
+//             data: 'You are out of zone. Please come in 50KM radius',
+//           });
+//         }
+//       }
+
+//       await this.userService.addScanIdInUser(userId, existing.id);
+//       return res.status(200).json({
+//         status: 200,
+//         message: 'success',
+//         data: existing,
+//       });
+//     }
+
+//     // 5) No existing place by title -> call ChatGPT / AI
+//     const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+//     console.log('the gpt data', gpt);
+
+//     // 6) Use Google Geocoding (first) or GPT coords + user location to decide confidence / zone
+//     if (userLat != null && userLon != null) {
+//       let targetLat: number | null = null;
+//       let targetLon: number | null = null;
+//       let coordSource: 'google' | 'gpt' | null = null;
+
+//       // 6.1) Try Google Geocoding first
+//       try {
+//         const googleResult = await this.visionService.searchGoogleGeocoding(
+//           placeName,
+//           userLat,
+//           userLon,
+//         );
+
+//         if (googleResult) {
+//           // Place is within 1km radius of user (your search method likely enforces this)
+//           targetLat = googleResult.lat;
+//           targetLon = googleResult.lon;
+//           coordSource = 'google';
+//           console.log('Using Google coords within 1km:', googleResult);
+//         } else {
+//           console.log(
+//             'Place not found within 1km of user (or geocoding failed):',
+//             placeName,
+//           );
+//         }
+//       } catch (e) {
+//         console.error('Error while calling Google Geocoding:', e);
+//       }
+
+//       // 6.2) If Google did NOT give coords, fallback to GPT coords
+//       if (targetLat == null || targetLon == null) {
+//         const gptLat =
+//           gpt?.latitude != null ? Number(gpt.latitude) : NaN;
+//         const gptLon =
+//           gpt?.longitude != null ? Number(gpt.longitude) : NaN;
+
+//         if (!Number.isNaN(gptLat) && !Number.isNaN(gptLon)) {
+//           targetLat = gptLat;
+//           targetLon = gptLon;
+//           coordSource = 'gpt';
+//           console.log('Using GPT coordinates:', { lat: gptLat, lon: gptLon });
+//         }
+//       }
+
+//       // 6.3) If still no coordinates from Google or GPT -> LOW_CONFIDENCE + nearbyPlaces
+//       if (targetLat == null || targetLon == null) {
+//         let nearbyPlaces: any[] = [];
+//         try {
+//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+//             userLat,
+//             userLon,
+//             3000, // 3km radius
+//           );
+//         } catch (err) {
+//           console.error(
+//             '[Lens] nearbyPlaces error (no coords from Google or GPT):',
+//             err,
+//           );
+//         }
+
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently recognize this building (no reliable location found). ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // 6.4) We have coordinates (from Google or GPT) -> compute distance
+//       const distKm = this.visionService.distanceKm(
+//         userLat,
+//         userLon,
+//         targetLat,
+//         targetLon,
+//       );
+//       console.log(`Distance from user (${coordSource}):`, distKm, 'km');
+
+//       // Outside general zone -> treat as LOW_CONFIDENCE with nearby places
+//       if (distKm > ZONE_MAX_KM) {
+//         let nearbyPlaces: any[] = [];
+//         try {
+//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+//             userLat,
+//             userLon,
+//             3000, // 3km radius
+//           );
+//         } catch (err) {
+//           console.error('[Lens] nearbyPlaces error (zone mismatch):', err);
+//         }
+
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently match this building within your location. ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // Inside zone but > STRICT_MAX_KM -> still LOW_CONFIDENCE
+//       if (distKm > STRICT_MAX_KM) {
+//         let nearbyPlaces: any[] = [];
+//         try {
+//           nearbyPlaces = await this.visionService.getNearbyPlacesSerp(
+//             userLat,
+//             userLon,
+//             3000, // 3km radius
+//           );
+//         } catch (err) {
+//           console.error('[Lens] nearbyPlaces error (strict radius):', err);
+//         }
+
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently match this building within 3km of your location. ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // If you reach here: distKm <= STRICT_MAX_KM -> HIGH_CONFIDENCE
+//     }
+
+//     // 6b) HIGH_CONFIDENCE: now check AGAIN by canonical AI title to avoid duplicates
+//     //     Example: two docs:
+//     //       title: "8 Spruce - Wikipedia", ai.title: "8 Spruce"
+//     //       title: "File:8 Spruce Street April 2022 003.jpg - Wikimedia Commons", ai.title: "8 Spruce"
+//     //     We want to reuse existing record where ai.title == gpt.title
+//     if (gpt?.name) {
+//       const aiTitle = String(gpt.name).trim();
+//       if (aiTitle) {
+//         const existingByAi =
+//           await this.visionService.findPlaceDetailByAiTitle(aiTitle);
+
+//         if (existingByAi) {
+//           await this.userService.addScanIdInUser(userId, existingByAi.id);
+//           return res.status(200).json({
+//             status: 200,
+//             message: 'success',
+//             data: existingByAi,
+//           });
+//         }
+//       }
+//     }
+
+//     // 7) No existing place -> upsert place in DB from Lens + GPT
+//     const placeDoc = await this.visionService.upsertPlaceFromLens({
+//       first,
+//       imageUrl: lensResult.imageUrl,
+//       gpt,
+//     });
+
+//     // 8) Attach place id to user
+//     await this.userService.addScanIdInUser(userId, String(placeDoc._id));
+
+//     // 9) Response: use AI title as main title
+//     const displayTitle = placeDoc.ai?.title || placeDoc.title;
+
+//     const responseData = {
+//       id: placeDoc._id,
+//       title: displayTitle,
+//       thumbnailImage: placeDoc.images?.thumbnail,
+//       originalImage: placeDoc.images?.original,
+//       chatgptTitle: placeDoc.ai?.title,
+//       shortDescription: placeDoc.ai?.shortDescription,
+//       tourismDescription: placeDoc.ai?.tourismDescription,
+//       funFacts: placeDoc.ai?.funFacts,
+//       heightMeters: placeDoc.ai?.heightMeters,
+//       latitude: placeDoc.ai?.latitude,
+//       longitude: placeDoc.ai?.longitude,
+//       architectureStyle: placeDoc.ai?.architectureStyle,
+//       architectName: placeDoc.ai?.architectName,
+//       location: placeDoc.ai?.location,
+//     };
+
+//     console.log('the response', responseData);
+
+//     return res.status(200).json({
+//       status: 200,
+//       message: 'success',
+//       data: responseData,
+//     });
+//   } catch (e: any) {
+//     console.error('[Lens] error:', e?.message || e);
+//     return res.status(400).json({
+//       status: 400,
+//       message: 'FAILURE',
+//       data: e?.message || 'Google Lens lookup failed',
+//     });
+//   }
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// @Post('lens')
+// @UseGuards(AuthGuard)
+// @UseFilters(new HttpExceptionFilter())
+// @UseInterceptors(
+//   FileFieldsInterceptor(
+//     [
+//       { name: 'image', maxCount: 1 },
+//       { name: 'file',  maxCount: 1 },
+//     ],
+//     {
+//       storage: memoryStorage(),
+//       limits: { fileSize: 10 * 1024 * 1024 },
+//     },
+//   ),
+// )
+// async recognizeWithLenss(
+//   @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
+//   @Body() body: RecognizeDto,
+//   @Query() query: RecognizeDto,
+//   @Req() req,
+//   @Res() res: Response,
+// ) {
+//   const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
+//   const userId = req.user?.sub;
+
+//   console.log('the body', body);
+
+//   // --- parse user location from frontend: lat, lon ---
+//   const latRaw = get('lat');
+//   const lonRaw = get('lon');
+
+//   const userLat =
+//     latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
+//   const userLon =
+//     lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
+
+//   if (
+//     (latRaw !== undefined && Number.isNaN(userLat)) ||
+//     (lonRaw !== undefined && Number.isNaN(userLon))
+//   ) {
+//     throw new BadRequestException('Invalid lat or lon');
+//   }
+
+//   // 1) Build image buffer
+//   let buf: Buffer | undefined;
+//   const up = files?.image?.[0] ?? files?.file?.[0];
+
+//   if (up?.buffer) {
+//     buf = up.buffer;
+//   } else if (get('image_base64')) {
+//     buf = Buffer.from(get('image_base64') as string, 'base64');
+//   } else if (get('image_url')) {
+//     const url = get('image_url') as string;
+//     const resp = await axios.get<ArrayBuffer>(url, {
+//       responseType: 'arraybuffer',
+//       timeout: 35000,
+//     });
+//     buf = Buffer.from(resp.data as any);
+//   }
+
+//   if (!buf) {
+//     throw new BadRequestException(
+//       "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
+//     );
+//   }
+
+//   // Helper to load nearby places (3km radius)
+//   const loadNearbyPlaces = async () => {
+//     if (userLat == null || userLon == null) return [];
+//     try {
+//       return await this.visionService.getNearbyPlacesSerp(
+//         userLat,
+//         userLon,
+//         3000, // 3km radius
+//       );
+//     } catch (err) {
+//       console.error('[Lens] nearbyPlaces error:', err);
+//       return [];
+//     }
+//   };
+
+//   try {
+//     // 2) Google Lens via SerpApi
+//     const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
+
+//     // Only treat as failure if there is NO visual match at all
+//     if (!lensResult.first) {
+//       const nearbyPlaces = await loadNearbyPlaces();
+//       return res.status(400).json({
+//         status: 400,
+//         message: 'LOW_CONFIDENCE',
+//         data: {
+//           reason:
+//             'We could not confidently recognize this building. ' +
+//             'Please try again and take a clearer photo from a different angle.',
+//           nearbyPlaces,
+//         },
+//       });
+//     }
+
+//     const first = lensResult.first;
+
+//     // 3) Derive canonical place name
+//     const placeName: string =
+//       lensResult.label ||
+//       lensResult.raw?.knowledge_graph?.title ||
+//       lensResult.raw?.knowledge_graph?.name ||
+//       lensResult.raw?.related_content?.[0]?.query ||
+//       first.title ||
+//       first.name ||
+//       first.link_title ||
+//       first.query ||
+//       'Unknown building';
+
+//     console.log('Derived placeName from Lens:', placeName);
+
+//     // distance thresholds (km)
+//     const STRICT_MAX_KM = 1;   // must be within 1km of user to trust match
+//     const ZONE_MAX_KM   = 30;  // allowed zone radius
+
+//     // 4) Existing place in DB? -> check area restriction, then return
+//     const existing = await this.visionService.findPlaceDetailSerp(placeName);
+//     if (existing) {
+//       const existingAny = existing as any;
+
+//       const existingLat =
+//         existingAny.aiLatitude ??
+//         existingAny.latitude ??
+//         existingAny.ai?.latitude ??
+//         existingAny.coordinates?.coordinates?.[1];
+
+//       const existingLon =
+//         existingAny.aiLongitude ??
+//         existingAny.longitude ??
+//         existingAny.ai?.longitude ??
+//         existingAny.coordinates?.coordinates?.[0];
+
+//       if (
+//         userLat != null &&
+//         userLon != null &&
+//         existingLat != null &&
+//         existingLon != null
+//       ) {
+//         const distKm = this.visionService.distanceKm(
+//           userLat,
+//           userLon,
+//           Number(existingLat),
+//           Number(existingLon),
+//         );
+
+//         if (distKm > ZONE_MAX_KM) {
+//           return res.status(400).json({
+//             status: 400,
+//             message: 'LOCATION_MISMATCH',
+//             data: 'You are out of zone. Please come in 50KM radius',
+//           });
+//         }
+//       }
+
+//       await this.userService.addScanIdInUser(userId, existing.id);
+//       return res.status(200).json({
+//         status: 200,
+//         message: 'success',
+//         data: existing,
+//       });
+//     }
+
+//     // 5) No existing place -> call ChatGPT / AI
+//     const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+//     console.log('the gpt data', gpt);
+
+//     // 5b) If GPT data is basically empty -> LOW_CONFIDENCE (your requested behavior)
+//     const normalize = (v: any) =>
+//       typeof v === 'string'
+//         ? v.trim()
+//         : v == null
+//         ? ''
+//         : String(v).trim();
+
+//     const gptName = normalize(gpt?.name ?? '');
+//     const shortDesc = normalize(gpt?.shortDescription);
+//     const tourismDesc = normalize(gpt?.tourismDescription);
+//     const archStyle = normalize(gpt?.architectureStyle);
+//     const architectName = normalize(gpt?.architectName);
+//     const locText = normalize(gpt?.location);
+
+//     const isGptEmpty =
+//       !gpt ||
+//       (
+//         !gptName &&
+//         !shortDesc &&
+//         !tourismDesc &&
+//         (!Array.isArray(gpt?.funFacts) || gpt.funFacts.length === 0) &&
+//         gpt?.heightMeters == null &&
+//         gpt?.latitude == null &&
+//         gpt?.longitude == null &&
+//         !archStyle &&
+//         !architectName &&
+//         !locText
+//       );
+
+//     if (isGptEmpty) {
+//       console.log('GPT data is empty/undefined -> LOW_CONFIDENCE');
+//       const nearbyPlaces = await loadNearbyPlaces();
+//       return res.status(400).json({
+//         status: 400,
+//         message: 'LOW_CONFIDENCE',
+//         data: {
+//           reason:
+//             'We could not confidently recognize this building. ' +
+//             'Please try again and take a clearer photo from a different angle.',
+//           nearbyPlaces,
+//         },
+//       });
+//     }
+
+//     // 6) Use Google Geocoding (first) or GPT coords + user location to decide confidence / zone
+//     if (userLat != null && userLon != null) {
+//       let targetLat: number | null = null;
+//       let targetLon: number | null = null;
+//       let coordSource: 'google' | 'gpt' | null = null;
+
+//       // 6.1) Try Google Geocoding first
+//       try {
+//         const googleResult = await this.visionService.searchGoogleGeocoding(
+//           placeName,
+//           userLat,
+//           userLon,
+//         );
+
+//         if (googleResult) {
+//           targetLat = googleResult.lat;
+//           targetLon = googleResult.lon;
+//           coordSource = 'google';
+//           console.log('Using Google coords within 1km:', googleResult);
+//         } else {
+//           console.log(
+//             'Place not found within 1km of user (or geocoding failed):',
+//             placeName,
+//           );
+//         }
+//       } catch (e) {
+//         console.error('Error while calling Google Geocoding:', e);
+//       }
+
+//       // 6.2) If Google did NOT give coords, fallback to GPT coords
+//       if (targetLat == null || targetLon == null) {
+//         const gptLat =
+//           gpt?.latitude != null ? Number(gpt.latitude) : NaN;
+//         const gptLon =
+//           gpt?.longitude != null ? Number(gpt.longitude) : NaN;
+
+//         if (!Number.isNaN(gptLat) && !Number.isNaN(gptLon)) {
+//           targetLat = gptLat;
+//           targetLon = gptLon;
+//           coordSource = 'gpt';
+//           console.log('Using GPT coordinates:', { lat: gptLat, lon: gptLon });
+//         }
+//       }
+
+//       // 6.3) If still no coordinates from Google or GPT -> LOW_CONFIDENCE + nearbyPlaces
+//       if (targetLat == null || targetLon == null) {
+//         const nearbyPlaces = await loadNearbyPlaces();
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently recognize this building (no reliable location found). ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // 6.4) We have coordinates (from Google or GPT) -> compute distance
+//       const distKm = this.visionService.distanceKm(
+//         userLat,
+//         userLon,
+//         targetLat,
+//         targetLon,
+//       );
+//       console.log(`Distance from user (${coordSource}):`, distKm, 'km');
+
+//       // Outside general zone -> treat as LOW_CONFIDENCE
+//       if (distKm > ZONE_MAX_KM) {
+//         const nearbyPlaces = await loadNearbyPlaces();
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently match this building within your location. ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // Inside zone but > STRICT_MAX_KM -> still LOW_CONFIDENCE
+//       if (distKm > STRICT_MAX_KM) {
+//         const nearbyPlaces = await loadNearbyPlaces();
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently match this building within 3km of your location. ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // If you reach here: distKm <= STRICT_MAX_KM -> HIGH_CONFIDENCE
+//     }
+
+//     // 6b) HIGH_CONFIDENCE: optional dedupe by AI canonical title (ai.title)
+//     const canonicalTitle = normalize(gptName);
+//     if (canonicalTitle) {
+//       try {
+//         const existingByAi =
+//           await this.visionService.findPlaceDetailByAiTitle(canonicalTitle);
+//         if (existingByAi) {
+//           await this.userService.addScanIdInUser(userId, existingByAi.id);
+//           return res.status(200).json({
+//             status: 200,
+//             message: 'success',
+//             data: existingByAi,
+//           });
+//         }
+//       } catch (err) {
+//         console.error('[Lens] findPlaceDetailByAiTitle error:', err);
+//       }
+//     }
+
+//     // 7) Upsert place in DB
+//     const placeDoc = await this.visionService.upsertPlaceFromLens({
+//       first,
+//       imageUrl: lensResult.imageUrl,
+//       gpt,
+//     });
+
+//     // 8) Attach place id to user
+//     await this.userService.addScanIdInUser(userId, String(placeDoc._id));
+
+//     // 9) Response: use AI title as main title if present
+//     const displayTitle = placeDoc.ai?.title || placeDoc.title;
+
+//     const responseData = {
+//       id: placeDoc._id,
+//       title: displayTitle,
+//       thumbnailImage: placeDoc.images?.thumbnail,
+//       originalImage: placeDoc.images?.original,
+//       chatgptTitle: placeDoc.ai?.title,
+//       shortDescription: placeDoc.ai?.shortDescription,
+//       tourismDescription: placeDoc.ai?.tourismDescription,
+//       funFacts: placeDoc.ai?.funFacts,
+//       heightMeters: placeDoc.ai?.heightMeters,
+//       latitude: placeDoc.ai?.latitude,
+//       longitude: placeDoc.ai?.longitude,
+//       architectureStyle: placeDoc.ai?.architectureStyle || '',
+//       architectName: placeDoc.ai?.architectName,
+//       location: placeDoc.ai?.location,
+//     };
+
+//     console.log('the response', responseData);
+
+//     return res.status(200).json({
+//       status: 200,
+//       message: 'success',
+//       data: responseData,
+//     });
+//   } catch (e: any) {
+//     console.error('[Lens] error:', e?.message || e);
+//     return res.status(400).json({
+//       status: 400,
+//       message: 'FAILURE',
+//       data: e?.message || 'Google Lens lookup failed',
+//     });
+//   }
+// }
+
+
+
+
+
+
+// @Post('lens')
+// @UseGuards(AuthGuard)
+// @UseFilters(new HttpExceptionFilter())
+// @UseInterceptors(
+//   FileFieldsInterceptor(
+//     [
+//       { name: 'image', maxCount: 1 },
+//       { name: 'file',  maxCount: 1 },
+//     ],
+//     {
+//       storage: memoryStorage(),
+//       limits: { fileSize: 10 * 1024 * 1024 },
+//     },
+//   ),
+// )
+// async recognizeWithLenss(
+//   @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
+//   @Body() body: RecognizeDto,
+//   @Query() query: RecognizeDto,
+//   @Req() req,
+//   @Res() res: Response,
+// ) {
+//   const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
+//   const userId = req.user?.sub;
+
+//   console.log('the body', body);
+
+//   // --- parse user location from frontend: lat, lon ---
+//   const latRaw = get('lat');
+//   const lonRaw = get('lon');
+
+//   const userLat = 40.7111884453876
+//   const userLon = -74.00532291283182
+
+//   // const userLat =
+//   //   latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
+//   // const userLon =
+//   //   lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
+
+//   if (
+//     (latRaw !== undefined && Number.isNaN(userLat)) ||
+//     (lonRaw !== undefined && Number.isNaN(userLon))
+//   ) {
+//     throw new BadRequestException('Invalid lat or lon');
+//   }
+
+//   // 1) Build image buffer
+//   let buf: Buffer | undefined;
+//   const up = files?.image?.[0] ?? files?.file?.[0];
+
+//   if (up?.buffer) {
+//     buf = up.buffer;
+//   } else if (get('image_base64')) {
+//     buf = Buffer.from(get('image_base64') as string, 'base64');
+//   } else if (get('image_url')) {
+//     const url = get('image_url') as string;
+//     const resp = await axios.get<ArrayBuffer>(url, {
+//       responseType: 'arraybuffer',
+//       timeout: 35000,
+//     });
+//     buf = Buffer.from(resp.data as any);
+//   }
+
+//   if (!buf) {
+//     throw new BadRequestException(
+//       "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
+//     );
+//   }
+
+//   // Helper to load nearby places (3km radius)
+//   const loadNearbyPlaces = async () => {
+//     if (userLat == null || userLon == null) return [];
+//     try {
+//       return await this.visionService.getNearbyPlacesSerp(
+//         userLat,
+//         userLon,
+//         3000, // 3km radius
+//       );
+//     } catch (err) {
+//       console.error('[Lens] nearbyPlaces error:', err);
+//       return [];
+//     }
+//   };
+
+//   try {
+//     // 2) Google Lens via SerpApi
+//     const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
+
+//     // Only treat as failure if there is NO visual match at all
+//     if (!lensResult.first) {
+//       const nearbyPlaces = await loadNearbyPlaces();
+//       return res.status(400).json({
+//         status: 400,
+//         message: 'LOW_CONFIDENCE',
+//         data: {
+//           reason:
+//             'We could not confidently recognize this building. ' +
+//             'Please try again and take a clearer photo from a different angle.',
+//           nearbyPlaces,
+//         },
+//       });
+//     }
+
+//     const first = lensResult.first;
+
+//     // 3) Derive canonical place name
+//     const placeName: string =
+//       lensResult.label ||
+//       lensResult.raw?.knowledge_graph?.title ||
+//       lensResult.raw?.knowledge_graph?.name ||
+//       lensResult.raw?.related_content?.[0]?.query ||
+//       first.title ||
+//       first.name ||
+//       first.link_title ||
+//       first.query ||
+//       'Unknown building';
+
+//     console.log('Derived placeName from Lens:', placeName);
+
+//     // distance thresholds (km)
+//     const STRICT_MAX_KM = 1;   // must be within 1km of user to trust match
+//     const ZONE_MAX_KM   = 30;  // allowed zone radius
+
+//     // 4) Existing place in DB by main title? -> check area restriction, then return
+//     const existing = await this.visionService.findPlaceDetailSerp(placeName);
+//     if (existing) {
+//       const existingAny = existing as any;
+
+//       const existingLat =
+//         existingAny.aiLatitude ??
+//         existingAny.latitude ??
+//         existingAny.ai?.latitude ??
+//         existingAny.coordinates?.coordinates?.[1];
+
+//       const existingLon =
+//         existingAny.aiLongitude ??
+//         existingAny.longitude ??
+//         existingAny.ai?.longitude ??
+//         existingAny.coordinates?.coordinates?.[0];
+
+//       if (
+//         userLat != null &&
+//         userLon != null &&
+//         existingLat != null &&
+//         existingLon != null
+//       ) {
+//         const distKm = this.visionService.distanceKm(
+//           userLat,
+//           userLon,
+//           Number(existingLat),
+//           Number(existingLon),
+//         );
+
+//         if (distKm > ZONE_MAX_KM) {
+//           return res.status(400).json({
+//             status: 400,
+//             message: 'LOCATION_MISMATCH',
+//             data: 'You are out of zone. Please come in 50KM radius',
+//           });
+//         }
+//       }
+
+//       await this.userService.addScanIdInUser(userId, existing.id);
+//       return res.status(200).json({
+//         status: 200,
+//         message: 'success',
+//         data: existing,
+//       });
+//     }
+
+//     // 4b) Existing place in DB by AI title? (ai.title == placeName)
+//     //     This handles cases where Google Lens name == AI title,
+//     //     but DB `title` is different (e.g. "8 Spruce - Wikipedia").
+//     const existingByAiTitle =
+//       await this.visionService.findPlaceDetailByAiTitle(placeName);
+//     if (existingByAiTitle) {
+//       console.log("in existingByAiTitle ", existingByAiTitle)
+//       const existingAny = existingByAiTitle as any;
+
+//       const existingLat =
+//         existingAny.aiLatitude ??
+//         existingAny.latitude ??
+//         existingAny.ai?.latitude ??
+//         existingAny.coordinates?.coordinates?.[1];
+
+//       const existingLon =
+//         existingAny.aiLongitude ??
+//         existingAny.longitude ??
+//         existingAny.ai?.longitude ??
+//         existingAny.coordinates?.coordinates?.[0];
+
+//       if (
+//         userLat != null &&
+//         userLon != null &&
+//         existingLat != null &&
+//         existingLon != null
+//       ) {
+//         const distKm = this.visionService.distanceKm(
+//           userLat,
+//           userLon,
+//           Number(existingLat),
+//           Number(existingLon),
+//         );
+
+//         if (distKm > ZONE_MAX_KM) {
+//           return res.status(400).json({
+//             status: 400,
+//             message: 'LOCATION_MISMATCH',
+//             data: 'You are out of zone. Please come in 50KM radius',
+//           });
+//         }
+//       }
+
+//       await this.userService.addScanIdInUser(userId, existingByAiTitle.id);
+//       return res.status(200).json({
+//         status: 200,
+//         message: 'success',
+//         data: existingByAiTitle,
+//       });
+//     }
+
+//     // 5) No existing place -> call ChatGPT / AI
+//     const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+//     console.log('the gpt data', gpt);
+
+//     // 5b) If GPT data is basically empty -> LOW_CONFIDENCE
+//     const normalize = (v: any) =>
+//       typeof v === 'string'
+//         ? v.trim()
+//         : v == null
+//         ? ''
+//         : String(v).trim();
+
+//     const gptName = normalize(gpt?.name ?? '');
+//     const shortDesc = normalize(gpt?.shortDescription);
+//     const tourismDesc = normalize(gpt?.tourismDescription);
+//     const archStyle = normalize(gpt?.architectureStyle);
+//     const architectName = normalize(gpt?.architectName);
+//     const locText = normalize(gpt?.location);
+
+//     const isGptEmpty =
+//       !gpt ||
+//       (
+//         !gptName &&
+//         !shortDesc &&
+//         !tourismDesc &&
+//         (!Array.isArray(gpt?.funFacts) || gpt.funFacts.length === 0) &&
+//         gpt?.heightMeters == null &&
+//         gpt?.latitude == null &&
+//         gpt?.longitude == null &&
+//         !archStyle &&
+//         !architectName &&
+//         !locText
+//       );
+
+//     if (isGptEmpty) {
+//       console.log('GPT data is empty/undefined -> LOW_CONFIDENCE');
+//       const nearbyPlaces = await loadNearbyPlaces();
+//       return res.status(400).json({
+//         status: 400,
+//         message: 'LOW_CONFIDENCE',
+//         data: {
+//           reason:
+//             'We could not confidently recognize this building. ' +
+//             'Please try again and take a clearer photo from a different angle.',
+//           nearbyPlaces,
+//         },
+//       });
+//     }
+
+//     // 6) Use Google Geocoding (first) or GPT coords + user location to decide confidence / zone
+//     if (userLat != null && userLon != null) {
+//       let targetLat: number | null = null;
+//       let targetLon: number | null = null;
+//       let coordSource: 'google' | 'gpt' | null = null;
+
+//       // 6.1) Try Google Geocoding first
+//       try {
+//         const googleResult = await this.visionService.searchGoogleGeocoding(
+//           placeName,
+//           userLat,
+//           userLon,
+//         );
+
+//         if (googleResult) {
+//           targetLat = googleResult.lat;
+//           targetLon = googleResult.lon;
+//           coordSource = 'google';
+//           console.log('Using Google coords within 1km:', googleResult);
+//         } else {
+//           console.log(
+//             'Place not found within 1km of user (or geocoding failed):',
+//             placeName,
+//           );
+//         }
+//       } catch (e) {
+//         console.error('Error while calling Google Geocoding:', e);
+//       }
+
+//       // 6.2) If Google did NOT give coords, fallback to GPT coords
+//       if (targetLat == null || targetLon == null) {
+//         const gptLat =
+//           gpt?.latitude != null ? Number(gpt.latitude) : NaN;
+//         const gptLon =
+//           gpt?.longitude != null ? Number(gpt.longitude) : NaN;
+
+//         if (!Number.isNaN(gptLat) && !Number.isNaN(gptLon)) {
+//           targetLat = gptLat;
+//           targetLon = gptLon;
+//           coordSource = 'gpt';
+//           console.log('Using GPT coordinates:', { lat: gptLat, lon: gptLon });
+//         }
+//       }
+
+//       // 6.3) If still no coordinates from Google or GPT -> LOW_CONFIDENCE + nearbyPlaces
+//       if (targetLat == null || targetLon == null) {
+//         const nearbyPlaces = await loadNearbyPlaces();
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently recognize this building (no reliable location found). ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // 6.4) We have coordinates (from Google or GPT) -> compute distance
+//       const distKm = this.visionService.distanceKm(
+//         userLat,
+//         userLon,
+//         targetLat,
+//         targetLon,
+//       );
+//       console.log(`Distance from user (${coordSource}):`, distKm, 'km');
+
+//       // Outside general zone -> treat as LOW_CONFIDENCE
+//       if (distKm > ZONE_MAX_KM) {
+//         const nearbyPlaces = await loadNearbyPlaces();
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently match this building within your location. ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // Inside zone but > STRICT_MAX_KM -> still LOW_CONFIDENCE
+//       if (distKm > STRICT_MAX_KM) {
+//         const nearbyPlaces = await loadNearbyPlaces();
+//         return res.status(400).json({
+//           status: 400,
+//           message: 'LOW_CONFIDENCE',
+//           data: {
+//             reason:
+//               'We could not confidently match this building within 3km of your location. ' +
+//               'Please try again and take a clearer photo from a different angle.',
+//             nearbyPlaces,
+//           },
+//         });
+//       }
+
+//       // If you reach here: distKm <= STRICT_MAX_KM -> HIGH_CONFIDENCE
+//     }
+
+//     // 6b) HIGH_CONFIDENCE: optional dedupe by AI canonical title (from GPT)
+//     const canonicalTitle = gptName; // already normalized above
+//     if (canonicalTitle) {
+//       try {
+//         const existingByAi =
+//           await this.visionService.findPlaceDetailByAiTitle(canonicalTitle);
+//         if (existingByAi) {
+//           await this.userService.addScanIdInUser(userId, existingByAi.id);
+//           return res.status(200).json({
+//             status: 200,
+//             message: 'success',
+//             data: existingByAi,
+//           });
+//         }
+//       } catch (err) {
+//         console.error('[Lens] findPlaceDetailByAiTitle error:', err);
+//       }
+//     }
+
+//     // 7) Upsert place in DB
+//     const placeDoc = await this.visionService.upsertPlaceFromLens({
+//       first,
+//       imageUrl: lensResult.imageUrl,
+//       gpt,
+//     });
+
+//     // 8) Attach place id to user
+//     await this.userService.addScanIdInUser(userId, String(placeDoc._id));
+
+//     // 9) Response: use AI title as main title if present
+//     const displayTitle = placeDoc.ai?.title || placeDoc.title;
+
+//     const responseData = {
+//       id: placeDoc._id,
+//       title: displayTitle,
+//       thumbnailImage: placeDoc.images?.thumbnail,
+//       originalImage: placeDoc.images?.original,
+//       chatgptTitle: placeDoc.ai?.title,
+//       shortDescription: placeDoc.ai?.shortDescription,
+//       tourismDescription: placeDoc.ai?.tourismDescription,
+//       funFacts: placeDoc.ai?.funFacts,
+//       heightMeters: placeDoc.ai?.heightMeters,
+//       latitude: placeDoc.ai?.latitude,
+//       longitude: placeDoc.ai?.longitude,
+//       architectureStyle: placeDoc.ai?.architectureStyle || '',
+//       architectName: placeDoc.ai?.architectName,
+//       location: placeDoc.ai?.location,
+//     };
+
+//     console.log('the response', responseData);
+
+//     return res.status(200).json({
+//       status: 200,
+//       message: 'success',
+//       data: responseData,
+//     });
+//   } catch (e: any) {
+//     console.error('[Lens] error:', e?.message || e);
+//     return res.status(400).json({
+//       status: 400,
+//       message: 'FAILURE',
+//       data: e?.message || 'Google Lens lookup failed',
+//     });
+//   }
+// }
+
+
+
+
+
+@Post('lens')
+@UseGuards(AuthGuard)
+@UseFilters(new HttpExceptionFilter())
+@UseInterceptors(
+  FileFieldsInterceptor(
+    [
+      { name: 'image', maxCount: 1 },
+      { name: 'file',  maxCount: 1 },
+    ],
+    {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    },
+  ),
+)
+async recognizeWithLenss(
+  @UploadedFiles() files: { image?: MulterFile[]; file?: MulterFile[] },
+  @Body() body: RecognizeDto,
+  @Query() query: RecognizeDto,
+  @Req() req,
+  @Res() res: Response,
+) {
+  const get = (k: keyof RecognizeDto) => body[k] ?? query[k];
+  const userId = req.user?.sub;
+
+  console.log('the body', body);
+
+  // --- parse user location from frontend: lat, lon ---
+  const latRaw = get('lat');
+  const lonRaw = get('lon');
+
+
+// const userLat = 40.74515301564258
+// const userLon = -73.97522004981336
+
+
+
+  const userLat =
+    latRaw !== undefined && latRaw !== null ? Number(latRaw) : undefined;
+  const userLon =
+    lonRaw !== undefined && lonRaw !== null ? Number(lonRaw) : undefined;
+
+  if (
+    (latRaw !== undefined && Number.isNaN(userLat)) ||
+    (lonRaw !== undefined && Number.isNaN(userLon))
+  ) {
+    throw new BadRequestException('Invalid lat or lon');
+  }
+
+  // 1) Build image buffer
+  let buf: Buffer | undefined;
+  const up = files?.image?.[0] ?? files?.file?.[0];
+
+  if (up?.buffer) {
+    buf = up.buffer;
+  } else if (get('image_base64')) {
+    buf = Buffer.from(get('image_base64') as string, 'base64');
+  } else if (get('image_url')) {
+    const url = get('image_url') as string;
+    const resp = await axios.get<ArrayBuffer>(url, {
+      responseType: 'arraybuffer',
+      timeout: 35000,
+    });
+    buf = Buffer.from(resp.data as any);
+  }
+
+  if (!buf) {
+    throw new BadRequestException(
+      "Provide an image via multipart 'image'/'file', or JSON 'image_base64'/'image_url'",
+    );
+  }
+
+  // Helper to load nearby places (3km radius) from your own DB + OSM
+  // const loadNearbyPlaces = async () => {
+  //   if (userLat == null || userLon == null) return [];
+  //   try {
+  //     return await this.visionService.getNearbyPlacesSerp(
+  //       userLat,
+  //       userLon,
+  //       3000, // 3km radius
+  //     );
+  //   } catch (err) {
+  //     console.error('[Lens] nearbyPlaces error:', err);
+  //     return [];
+  //   }
+  // };
+
+
+  const loadNearbyData = async () => {
+  if (userLat == null || userLon == null) {
+    return { nearbyPlaces: [], areaName: null };
+  }
+
+  try {
+    const [nearbyPlaces, areaName] = await Promise.all([
+      this.visionService.getNearbyPlacesSerp(userLat, userLon, 10000),
+      this.visionService.getAreaNameFromCoords(userLat, userLon),
+    ]);
+
+    return { nearbyPlaces, areaName };
+  } catch (err) {
+    console.error('[Lens] nearbyData error:', err);
+    return { nearbyPlaces: [], areaName: null };
+  }
+};
+
+  try {
+    // 2) Google Lens via SerpApi
+    const lensResult = await this.visionService.recognizeWithGoogleLens(buf);
+
+    // Only treat as failure if there is NO visual match at all
+    if (!lensResult.first) {
+const { nearbyPlaces, areaName } = await loadNearbyData();
+
+
+
+const areaText = areaName ? areaName : 'your area';
+console.log("the first is", areaText)
+
+return res.status(400).json({
+  status: 400,
+  message: 'LOW_CONFIDENCE',
+  data: {
+    reason:
+      'We couldn’t identify this building. Please try again and take a clearer photo from a different angle. ' +
+      `Wherever you’re in ${areaText}, here are great things to do nearby`,
+    nearbyPlaces,
+  },
+});
+    }
+
+    const first = lensResult.first;
+
+    // 3) Derive canonical place name from Lens
+    const placeName: string =
+      lensResult.label ||
+      lensResult.raw?.knowledge_graph?.title ||
+      lensResult.raw?.knowledge_graph?.name ||
+      lensResult.raw?.related_content?.[0]?.query ||
+      first.title ||
+      first.name ||
+      first.link_title ||
+      first.query ||
+      'Unknown building';
+
+    console.log('Derived placeName from Lens:', placeName);
+
+    // distance thresholds (km)
+    const STRICT_MAX_KM = 1;   // must be within 1km of user to trust match
+    const ZONE_MAX_KM   = 30;  // allowed zone radius
+
+    // 4) Existing place in DB by main title? -> check area restriction, then return
+    const existing = await this.visionService.findPlaceDetailSerp(placeName);
+    if (existing) {
+      const existingAny = existing as any;
+
+      const existingLat =
+        existingAny.aiLatitude ??
+        existingAny.latitude ??
+        existingAny.ai?.latitude ??
+        existingAny.coordinates?.coordinates?.[1];
+
+      const existingLon =
+        existingAny.aiLongitude ??
+        existingAny.longitude ??
+        existingAny.ai?.longitude ??
+        existingAny.coordinates?.coordinates?.[0];
+
+      if (
+        userLat != null &&
+        userLon != null &&
+        existingLat != null &&
+        existingLon != null
+      ) {
+        const distKm = this.visionService.distanceKm(
+          userLat,
+          userLon,
+          Number(existingLat),
+          Number(existingLon),
+        );
+
+        if (distKm > ZONE_MAX_KM) {
+          return res.status(400).json({
+            status: 400,
+            message: 'LOCATION_MISMATCH',
+            data: 'You are out of zone. Please come in 50KM radius',
+          });
+        }
+      }
+
+      await this.userService.addScanIdInUser(userId, existing.id);
+      return res.status(200).json({
+        status: 200,
+        message: 'success',
+        data: existing,
+      });
+    }
+
+    // 4b) Existing place in DB by AI title? (ai.title == placeName)
+    const existingByAiTitle =
+      await this.visionService.findPlaceDetailByAiTitle(placeName);
+    if (existingByAiTitle) {
+      console.log('in existingByAiTitle ', existingByAiTitle);
+      const existingAny = existingByAiTitle as any;
+
+      const existingLat =
+        existingAny.aiLatitude ??
+        existingAny.latitude ??
+        existingAny.ai?.latitude ??
+        existingAny.coordinates?.coordinates?.[1];
+
+      const existingLon =
+        existingAny.aiLongitude ??
+        existingAny.longitude ??
+        existingAny.ai?.longitude ??
+        existingAny.coordinates?.coordinates?.[0];
+
+      if (
+        userLat != null &&
+        userLon != null &&
+        existingLat != null &&
+        existingLon != null
+      ) {
+        const distKm = this.visionService.distanceKm(
+          userLat,
+          userLon,
+          Number(existingLat),
+          Number(existingLon),
+        );
+
+        if (distKm > ZONE_MAX_KM) {
+          return res.status(400).json({
+            status: 400,
+            message: 'LOCATION_MISMATCH',
+            data: 'You are out of zone. Please come in 50KM radius',
+          });
+        }
+      }
+
+      await this.userService.addScanIdInUser(userId, existingByAiTitle.id);
+      return res.status(200).json({
+        status: 200,
+        message: 'success',
+        data: existingByAiTitle,
+      });
+    }
+
+    // 5) No existing place -> call ChatGPT / AI
+    const gpt = await this.visionService.getBuildingInfoFromChatGPT(placeName);
+    console.log('the gpt data', gpt);
+
+    // 5b) If GPT data is basically empty -> LOW_CONFIDENCE
+    const normalize = (v: any) =>
+      typeof v === 'string'
+        ? v.trim()
+        : v == null
+        ? ''
+        : String(v).trim();
+
+    const gptName = normalize(gpt?.name ?? '');
+    const shortDesc = normalize(gpt?.shortDescription);
+    const tourismDesc = normalize(gpt?.tourismDescription);
+    const archStyle = normalize(gpt?.architectureStyle);
+    const architectName = normalize(gpt?.architectName);
+    const locText = normalize(gpt?.location);
+
+    const isGptEmpty =
+      !gpt ||
+      (
+        !gptName &&
+        !shortDesc &&
+        !tourismDesc &&
+        (!Array.isArray(gpt?.funFacts) || gpt.funFacts.length === 0) &&
+        gpt?.heightMeters == null &&
+        gpt?.latitude == null &&
+        gpt?.longitude == null &&
+        !archStyle &&
+        !architectName &&
+        !locText
+      );
+
+    if (isGptEmpty) {
+      console.log('GPT data is empty/undefined -> LOW_CONFIDENCE');
+     const { nearbyPlaces, areaName } = await loadNearbyData();
+
+const areaText = areaName ? areaName : 'your area';
+console.log("the second  is", areaText)
+return res.status(400).json({
+  status: 400,
+  message: 'LOW_CONFIDENCE',
+  data: {
+    reason:
+      'We couldn’t identify this building. Please try again and take a clearer photo from a different angle. ' +
+      `Wherever you’re in ${areaText}, here are great things to do nearby`,
+    nearbyPlaces,
+  },
+});
+    }
+
+    // prepare holders for Google Places data
+    let googlePlace: any = null;
+    let googlePlacePhotoUrls: string[] = [];
+    let googleNearby: any[] = [];
+
+    // 6) Use Google Places (first) or GPT coords + user location to decide confidence / zone
+    if (userLat != null && userLon != null) {
+      let targetLat: number | null = null;
+      let targetLon: number | null = null;
+      let coordSource: 'googlePlaces' | 'gpt' | null = null;
+
+      // 6.1) Try Google Places first (1km around user)
+      try {
+        const nameForPlaces = gptName || placeName;
+
+        googlePlace = await this.visionService.searchGooglePlace(
+          nameForPlaces,
+          userLat,
+          userLon,
+        );
+
+        if (googlePlace) {
+          targetLat = googlePlace.lat;
+          targetLon = googlePlace.lon;
+          coordSource = 'googlePlaces';
+          console.log('Using Google Places coords within 1km:', googlePlace);
+        } else {
+          console.log(
+            'Google Places: no nearby match, will fall back to GPT coords (if any)',
+          );
+        }
+      } catch (e) {
+        console.error('Error while calling Google Places:', e);
+      }
+
+      // 6.2) If Google Places did NOT give coords, fallback to GPT coords
+      if (targetLat == null || targetLon == null) {
+        const gptLat =
+          gpt?.latitude != null ? Number(gpt.latitude) : NaN;
+        const gptLon =
+          gpt?.longitude != null ? Number(gpt.longitude) : NaN;
+
+        if (!Number.isNaN(gptLat) && !Number.isNaN(gptLon)) {
+          targetLat = gptLat;
+          targetLon = gptLon;
+          coordSource = 'gpt';
+          console.log('Using GPT coordinates:', { lat: gptLat, lon: gptLon });
+        }
+      }
+
+      // 6.3) If still no coordinates -> LOW_CONFIDENCE + nearbyPlaces from DB/OSM
+      if (targetLat == null || targetLon == null) {
+       const { nearbyPlaces, areaName } = await loadNearbyData();
+
+const areaText = areaName ? areaName : 'your area';
+console.log("the third is", areaText)
+return res.status(400).json({
+  status: 400,
+  message: 'LOW_CONFIDENCE',
+  data: {
+    reason:
+      'We couldn’t identify this building. Please try again and take a clearer photo from a different angle. ' +
+      `Wherever you’re in ${areaText}, here are great things to do nearby`,
+    nearbyPlaces,
+  },
+});
+      }
+
+      // 6.4) We have coordinates (from Google Places or GPT) -> compute distance
+      const distKm = this.visionService.distanceKm(
+        userLat,
+        userLon,
+        targetLat,
+        targetLon,
+      );
+      console.log(`Distance from user (${coordSource}):`, distKm, 'km');
+
+      // Outside general zone -> treat as LOW_CONFIDENCE
+      if (distKm > ZONE_MAX_KM) {
+       const { nearbyPlaces, areaName } = await loadNearbyData();
+
+const areaText = areaName ? areaName : 'your area';
+console.log("the fourth is", areaText)
+return res.status(400).json({
+  status: 400,
+  message: 'LOW_CONFIDENCE',
+  data: {
+    reason:
+      'We couldn’t identify this building. Please try again and take a clearer photo from a different angle. ' +
+      `Wherever you’re in ${areaText}, here are great things to do nearby`,
+    nearbyPlaces,
+  },
+});
+      }
+
+      // Inside zone but > STRICT_MAX_KM (1km) -> LOW_CONFIDENCE
+      if (distKm > STRICT_MAX_KM) {
+       const { nearbyPlaces, areaName } = await loadNearbyData();
+
+const areaText = areaName ? areaName : 'your area';
+console.log("the fifth is", areaText)
+return res.status(400).json({
+  status: 400,
+  message: 'LOW_CONFIDENCE',
+  data: {
+    reason:
+      'We couldn’t identify this building. Please try again and take a clearer photo from a different angle. ' +
+      `Wherever you’re in ${areaText}, here are great things to do nearby`,
+    nearbyPlaces,
+  },
+});
+      }
+
+      // If you reach here: distKm <= STRICT_MAX_KM -> HIGH_CONFIDENCE
+
+      // Fetch Google Place photos (up to 3) if we have a matched place
+      if (googlePlace) {
+        try {
+          googlePlacePhotoUrls =
+            await this.visionService.fetchPlacePhotosFromGoogle(
+              googlePlace,
+              2,
+            );
+        } catch (err) {
+          console.error('[Lens] fetchPlacePhotosFromGoogle error:', err);
+        }
+
+        try {
+          googleNearby =
+            await this.visionService.getNearbyThingsFromGoogle(
+              googlePlace.lat,
+              googlePlace.lon,
+              1000, // 1km
+            );
+        } catch (err) {
+          console.error('[Lens] getNearbyThingsFromGoogle error:', err);
+        }
+      } else {
+        // No googlePlace, but we still have targetLat/targetLon -> we can at least get nearby POIs
+        try {
+          googleNearby =
+            await this.visionService.getNearbyThingsFromGoogle(
+              targetLat,
+              targetLon,
+              1000,
+            );
+        } catch (err) {
+          console.error('[Lens] getNearbyThingsFromGoogle (GPT coords) error:', err);
+        }
+      }
+    }
+
+    // 6b) HIGH_CONFIDENCE: optional dedupe by AI canonical title (from GPT)
+    const canonicalTitle = gptName; // already normalized above
+    if (canonicalTitle) {
+      try {
+        const existingByAi =
+          await this.visionService.findPlaceDetailByAiTitle(canonicalTitle);
+        if (existingByAi) {
+          await this.userService.addScanIdInUser(userId, existingByAi.id);
+          return res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: existingByAi,
+          });
+        }
+      } catch (err) {
+        console.error('[Lens] findPlaceDetailByAiTitle error:', err);
+      }
+    }
+
+    // 7) Upsert place in DB (now includes Google Places images & nearby)
+    const placeDoc = await this.visionService.upsertPlaceFromLens({
+      first,
+      imageUrl: lensResult.imageUrl,
+      gpt,
+      googlePlace,
+      googlePlacePhotoUrls,
+      googleNearby,
+    });
+
+    // 8) Attach place id to user
+    await this.userService.addScanIdInUser(userId, String(placeDoc._id));
+
+
+//     // 9) Response: use AI title as main title if present
+// const displayTitle = placeDoc.ai?.title || placeDoc.title;
+
+// // 1) Get URLs from images.gallery
+// const galleryItems = placeDoc.images?.gallery ?? [];
+
+// // pick best URL from each gallery item
+// const rawUrls: string[] = galleryItems
+//   .map((g: any) =>
+//     g?.original || g?.thumbnail || g?.localOriginal || g?.localThumbnail,
+//   )
+//   .filter((u: string | undefined) => !!u);
+
+// // 2) Remove duplicate URLs (so first/second won't be the same)
+// const uniqueUrls: string[] = [];
+// const seen = new Set<string>();
+// for (const u of rawUrls) {
+//   if (!seen.has(u)) {
+//     seen.add(u);
+//     uniqueUrls.push(u);
+//   }
+// }
+
+// // 3) Build gallery ARRAY with named fields
+// const gallery = [
+//   {
+//     name: 'firstPlaceImage',
+//     url: uniqueUrls[0] ?? null,
+//   },
+//   {
+//     name: 'secondPlaceImage',
+//     url: uniqueUrls[1] ?? null,
+//   },
+//   {
+//     name: 'thirdPlaceImage',
+//     url: uniqueUrls[2] ?? null,
+//   },
+// ];
+
+// const responseData = {
+//   id: placeDoc._id,
+//   title: displayTitle,
+//   thumbnailImage: placeDoc.images?.thumbnail,
+//   originalImage: placeDoc.images?.original,
+
+//   // <-- this is what frontend will use
+//   gallery,
+
+//   chatgptTitle: placeDoc.ai?.title,
+//   shortDescription: placeDoc.ai?.shortDescription,
+//   tourismDescription: placeDoc.ai?.tourismDescription,
+//   funFacts: placeDoc.ai?.funFacts,
+//   heightMeters: placeDoc.ai?.heightMeters,
+//   latitude: placeDoc.ai?.latitude,
+//   longitude: placeDoc.ai?.longitude,
+//   architectureStyle: placeDoc.ai?.architectureStyle || '',
+//   architectName: (placeDoc.ai as any)?.architectName,
+//   location: (placeDoc.ai as any)?.location,
+//   nearby: (placeDoc as any).nearby ?? placeDoc.raw?.googleNearby ?? [],
+// };
+
+
+
+
+
+
+const displayTitle = placeDoc.ai?.title || placeDoc.title;
+
+const responseData = {
+  id: placeDoc._id,
+  title: displayTitle,
+  thumbnailImage: placeDoc.images?.thumbnail,
+  originalImage: placeDoc.images?.original,
+
+  // <-- EXACT field you want
+  gallery: placeDoc.gallery ?? {
+    firstGooglePlace: null,
+    secondGooglePlace: null,
+  },
+
+  chatgptTitle: placeDoc.ai?.title,
+  shortDescription: placeDoc.ai?.shortDescription,
+  tourismDescription: placeDoc.ai?.tourismDescription,
+  funFacts: placeDoc.ai?.funFacts,
+  heightMeters: placeDoc.ai?.heightMeters,
+  latitude: placeDoc.ai?.latitude,
+  longitude: placeDoc.ai?.longitude,
+  architectureStyle: placeDoc.ai?.architectureStyle || '',
+  architectName: (placeDoc.ai as any)?.architectName,
+  location: (placeDoc.ai as any)?.location,
+  nearby: (placeDoc as any).nearby ?? placeDoc.raw?.googleNearby ?? [],
+};
+
+console.log('the response', responseData);
+
+return res.status(200).json({
+  status: 200,
+  message: 'success',
+  data: responseData,
+});
+
+
+    // 9) Response: use AI title as main title if present
+    // const displayTitle = placeDoc.ai?.title || placeDoc.title;
+
+    // const responseData = {
+    //   id: placeDoc._id,
+    //   title: displayTitle,
+    //   thumbnailImage: placeDoc.images?.thumbnail,
+    //   originalImage: placeDoc.images?.original,
+    //   gallery: placeDoc.images?.gallery ?? [],
+    //   chatgptTitle: placeDoc.ai?.title,
+    //   shortDescription: placeDoc.ai?.shortDescription,
+    //   tourismDescription: placeDoc.ai?.tourismDescription,
+    //   funFacts: placeDoc.ai?.funFacts,
+    //   heightMeters: placeDoc.ai?.heightMeters,
+    //   latitude: placeDoc.ai?.latitude,
+    //   longitude: placeDoc.ai?.longitude,
+    //   architectureStyle: placeDoc.ai?.architectureStyle || '',
+    //   architectName: (placeDoc.ai as any)?.architectName,
+    //   location: (placeDoc.ai as any)?.location,
+    //   nearby: (placeDoc as any).nearby ?? placeDoc.raw?.googleNearby ?? [],
+    // };
+
+   
+  } catch (e: any) {
+    console.error('[Lens] error:', e?.message || e);
+    return res.status(400).json({
+      status: 400,
+      message: 'FAILURE',
+      data: e?.message || 'Google Lens lookup failed',
+    });
+  }
+}
+
+
+
+
+
+
+
+
 
 
 

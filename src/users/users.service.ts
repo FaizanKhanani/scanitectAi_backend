@@ -536,16 +536,26 @@ async editProfile(
 }
 
 
+async addScanIdInUser(userId: any, scanId: any) {
 
-async addScanIdInUser(userId: string, scanId: string){
+  if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(scanId)) {
+    throw new Error('Invalid userId or scanId');
+  }
 
-const addScanId = await this.userModel.updateOne(
-  { _id: userId },
-  { $addToSet: { scanAreas: scanId } }
-);
+  const userObjectId = new Types.ObjectId(userId);
+  const scanObjectId = new Types.ObjectId(scanId);
 
-return addScanId
+  console.log('userObjectId:', userObjectId);
+  console.log('scanObjectId:', scanObjectId);
 
+  const result = await this.userModel.updateOne(
+    { _id: userObjectId },
+    { $push: { scanAreas: scanObjectId } }
+  );
+
+  console.log('update result:', result);
+
+  return result;
 }
 
 

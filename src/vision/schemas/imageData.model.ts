@@ -88,6 +88,227 @@
 
 
 
+// // src/schemas/place.schema.ts
+// import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+// import { Document, SchemaTypes } from 'mongoose';
+
+// export type PlaceDocument = Place & Document;
+
+// @Schema({ _id: false })
+// class GeoPoint {
+//   @Prop({ enum: ['Point'], default: 'Point' })
+//   type: 'Point';
+
+//   @Prop({ type: [Number], required: true }) // [lon, lat]
+//   coordinates: [number, number];
+// }
+
+// @Schema({ _id: false })
+// class ImageItem {
+//   @Prop() title?: string;
+//   @Prop() original?: string;
+//   @Prop() thumbnail?: string;
+//   @Prop() localOriginal?: string;
+//   @Prop() localThumbnail?: string;
+// }
+
+// @Schema({ _id: false })
+// class Images {
+//   @Prop() thumbnail?: string;
+//   @Prop() original?: string;
+//   @Prop() localThumbnail?: string;
+//   @Prop() localOriginal?: string;
+
+//   @Prop({ type: [ImageItem], default: [] })
+//   gallery?: ImageItem[];
+// }
+
+// @Schema({ _id: false })
+// class WikidataSubdoc {
+//   @Prop() qid?: string;
+//   @Prop([String]) instanceOf?: string[];
+//   @Prop([String]) countries?: string[];
+//   @Prop([String]) administrativeAreas?: string[];
+//   @Prop([String]) ranges?: string[];
+//   @Prop() elevation_m?: number;
+//   @Prop() height_m?: number;
+//   @Prop() prominence_m?: number;
+//   @Prop() isolation_km?: number;
+//   @Prop([String]) architects?: string[];
+//   @Prop({ type: GeoPoint, required: false }) coordinates?: GeoPoint;
+// }
+
+// // NEW: AI / ChatGPT info subdocument
+// @Schema({ _id: false })
+// class AiInfo {
+//   @Prop() title?: string;                 // NEW: title/name from ChatGPT
+//   @Prop() shortDescription?: string;      // from ChatGPT
+//   @Prop() tourismDescription?: string;    // from ChatGPT
+//   @Prop([String]) funFacts?: string[];    // from ChatGPT
+//   @Prop() heightMeters?: number;          // from ChatGPT
+//   @Prop() latitude?: number;              // from ChatGPT
+//   @Prop() longitude?: number;             // from ChatGPT
+//   @Prop() architectureStyle?: string;     // from ChatGPT
+// }
+// @Schema({ timestamps: true })
+// export class Place {
+//   @Prop({ required: true }) title: string;
+//   @Prop() pageUrl?: string;
+
+//   @Prop() descriptionShort?: string;
+//   @Prop() descriptionHtml?: string;
+//   @Prop() descriptionLong?: string;
+
+//   @Prop({ type: Images, default: {} }) images?: Images;
+//   @Prop({ type: GeoPoint, required: false }) coordinates?: GeoPoint;
+
+//   @Prop({ type: WikidataSubdoc, default: {} }) wikidata?: WikidataSubdoc;
+
+//   // NEW: AI-generated info (ChatGPT)
+//   @Prop({ type: AiInfo, default: {} }) ai?: AiInfo;
+
+//   // optional: keep raw API payload for debugging
+//   @Prop({ type: SchemaTypes.Mixed }) raw?: any;
+// }
+
+// export const PlaceSchema = SchemaFactory.createForClass(Place);
+
+// // Indexes
+// PlaceSchema.index({ 'wikidata.qid': 1 }, { unique: true, sparse: true });
+// PlaceSchema.index({ coordinates: '2dsphere' });
+// PlaceSchema.index({ 'wikidata.coordinates': '2dsphere' });
+// PlaceSchema.index({ title: 'text', descriptionShort: 'text' });
+
+
+
+
+
+
+
+
+
+// // src/schemas/place.schema.ts
+// import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+// import { Document, SchemaTypes } from 'mongoose';
+
+// export type PlaceDocument = Place & Document;
+
+// @Schema({ _id: false })
+// class GeoPoint {
+//   @Prop({ enum: ['Point'], default: 'Point' })
+//   type: 'Point';
+
+//   @Prop({ type: [Number], required: true }) // [lon, lat]
+//   coordinates: [number, number];
+// }
+
+// @Schema({ _id: false })
+// class ImageItem {
+//   @Prop() title?: string;
+//   @Prop() original?: string;
+//   @Prop() thumbnail?: string;
+//   @Prop() localOriginal?: string;
+//   @Prop() localThumbnail?: string;
+// }
+
+// @Schema({ _id: false })
+// class Images {
+//   @Prop() thumbnail?: string;
+//   @Prop() original?: string;
+//   @Prop() localThumbnail?: string;
+//   @Prop() localOriginal?: string;
+
+//   @Prop({ type: [ImageItem], default: [] })
+//   gallery?: ImageItem[];
+// }
+
+// @Schema({ _id: false })
+// class WikidataSubdoc {
+//   @Prop() qid?: string;
+//   @Prop([String]) instanceOf?: string[];
+//   @Prop([String]) countries?: string[];
+//   @Prop([String]) administrativeAreas?: string[];
+//   @Prop([String]) ranges?: string[];
+//   @Prop() elevation_m?: number;
+//   @Prop() height_m?: number;
+//   @Prop() prominence_m?: number;
+//   @Prop() isolation_km?: number;
+//   @Prop([String]) architects?: string[];
+//   @Prop({ type: GeoPoint, required: false }) coordinates?: GeoPoint;
+// }
+
+// // AI / ChatGPT info subdocument
+// @Schema({ _id: false })
+// class AiInfo {
+//   @Prop() title?: string;                 // title/name from ChatGPT
+//   @Prop() shortDescription?: string;      // from ChatGPT
+//   @Prop() tourismDescription?: string;    // from ChatGPT
+//   @Prop([String]) funFacts?: string[];    // from ChatGPT
+//   @Prop() heightMeters?: number;          // from ChatGPT
+//   @Prop() latitude?: number;              // from ChatGPT
+//   @Prop() longitude?: number;             // from ChatGPT
+//   @Prop() architectureStyle?: string;     // from ChatGPT
+//   @Prop() architectName?: string;         // from ChatGPT
+//   @Prop() location?: string;              // from ChatGPT (e.g. "Kips Bay, Manhattan")
+// }
+
+// // Nearby “things to do” (from Google Places)
+// @Schema({ _id: false })
+// class NearbyPlaceInfo {
+//   @Prop() placeId?: string;               // Google place_id
+//   @Prop() title?: string;                 // name of the place
+//   @Prop([String]) types?: string[];       // Google place types
+//   @Prop() distanceMeters?: number;        // distance from main place
+//   @Prop() latitude?: number;
+//   @Prop() longitude?: number;
+// }
+
+// @Schema({ timestamps: true })
+// export class Place {
+//   @Prop({ required: true }) title: string;
+//   @Prop() pageUrl?: string;
+
+//   @Prop() descriptionShort?: string;
+//   @Prop() descriptionHtml?: string;
+//   @Prop() descriptionLong?: string;
+
+//   @Prop({ type: Images, default: {} }) images?: Images;
+//   @Prop({ type: GeoPoint, required: false }) coordinates?: GeoPoint;
+
+//   @Prop({ type: WikidataSubdoc, default: {} }) wikidata?: WikidataSubdoc;
+
+//   // AI-generated info (ChatGPT)
+//   @Prop({ type: AiInfo, default: {} }) ai?: AiInfo;
+
+//   // Nearby places (things to do within ~1km)
+//   @Prop({ type: [NearbyPlaceInfo], default: [] })
+//   nearby?: NearbyPlaceInfo[];
+
+//   // optional: keep raw API payload for debugging (Lens, GPT, Google Places, etc.)
+//   @Prop({ type: SchemaTypes.Mixed }) raw?: any;
+// }
+
+// export const PlaceSchema = SchemaFactory.createForClass(Place);
+
+// // Indexes
+// PlaceSchema.index({ 'wikidata.qid': 1 }, { unique: true, sparse: true });
+// PlaceSchema.index({ coordinates: '2dsphere' });
+// PlaceSchema.index({ 'wikidata.coordinates': '2dsphere' });
+// PlaceSchema.index({ title: 'text', descriptionShort: 'text' });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // src/schemas/place.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes } from 'mongoose';
@@ -138,10 +359,10 @@ class WikidataSubdoc {
   @Prop({ type: GeoPoint, required: false }) coordinates?: GeoPoint;
 }
 
-// NEW: AI / ChatGPT info subdocument
+// AI / ChatGPT info subdocument
 @Schema({ _id: false })
 class AiInfo {
-  @Prop() title?: string;                 // NEW: title/name from ChatGPT
+  @Prop() title?: string;                 // title/name from ChatGPT
   @Prop() shortDescription?: string;      // from ChatGPT
   @Prop() tourismDescription?: string;    // from ChatGPT
   @Prop([String]) funFacts?: string[];    // from ChatGPT
@@ -149,7 +370,28 @@ class AiInfo {
   @Prop() latitude?: number;              // from ChatGPT
   @Prop() longitude?: number;             // from ChatGPT
   @Prop() architectureStyle?: string;     // from ChatGPT
+  @Prop() architectName?: string;         // from ChatGPT
+  @Prop() location?: string;              // from ChatGPT (e.g. "Kips Bay, Manhattan")
 }
+
+// Nearby “things to do” (from Google Places)
+@Schema({ _id: false })
+class NearbyPlaceInfo {
+  @Prop() placeId?: string;               // Google place_id
+  @Prop() title?: string;                 // name of the place
+  @Prop([String]) types?: string[];       // Google place types
+  @Prop() distanceMeters?: number;        // distance from main place
+  @Prop() latitude?: number;
+  @Prop() longitude?: number;
+}
+
+// NEW: simple gallery URLs from Google Places
+@Schema({ _id: false })
+class GalleryUrls {
+  @Prop() firstGooglePlace?: string | null;
+  @Prop() secondGooglePlace?: string | null;
+}
+
 @Schema({ timestamps: true })
 export class Place {
   @Prop({ required: true }) title: string;
@@ -164,10 +406,18 @@ export class Place {
 
   @Prop({ type: WikidataSubdoc, default: {} }) wikidata?: WikidataSubdoc;
 
-  // NEW: AI-generated info (ChatGPT)
+  // AI-generated info (ChatGPT)
   @Prop({ type: AiInfo, default: {} }) ai?: AiInfo;
 
-  // optional: keep raw API payload for debugging
+  // Nearby places (things to do within ~1km)
+  @Prop({ type: [NearbyPlaceInfo], default: [] })
+  nearby?: NearbyPlaceInfo[];
+
+  // Simple Google Places gallery URLs
+  @Prop({ type: GalleryUrls, default: {} })
+  gallery?: GalleryUrls;
+
+  // optional: keep raw API payload for debugging (Lens, GPT, Google Places, etc.)
   @Prop({ type: SchemaTypes.Mixed }) raw?: any;
 }
 
