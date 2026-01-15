@@ -2175,20 +2175,7 @@ async recognizeWithLenss(
     );
   }
 
-  // Helper to load nearby places (3km radius) from your own DB + OSM
-  // const loadNearbyPlaces = async () => {
-  //   if (userLat == null || userLon == null) return [];
-  //   try {
-  //     return await this.visionService.getNearbyPlacesSerp(
-  //       userLat,
-  //       userLon,
-  //       3000, // 3km radius
-  //     );
-  //   } catch (err) {
-  //     console.error('[Lens] nearbyPlaces error:', err);
-  //     return [];
-  //   }
-  // };
+
 
 
   const loadNearbyData = async () => {
