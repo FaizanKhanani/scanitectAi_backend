@@ -219,50 +219,57 @@ private async applySubscriptionPackage(
 //   }
 
 
-async ensureSubscriptionValid(userId: string): Promise<UserDocument> {
-  const user = await this.userModel.findById(userId);
-  if (!user) throw new NotFoundException('User not found');
+  async ensureSubscriptionValid(userId: string): Promise<UserDocument> {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
 
-  if (
-    user.subscriptionExpiresAt &&
-    user.subscriptionExpiresAt.getTime() < Date.now()
-  ) {
-    user.plan = 'free';
-    user.subscriptionStartedAt = null;
-    user.subscriptionExpiresAt = null;
+    const now = new Date();
+    if (
+      user.subscriptionExpiresAt &&
+      user.subscriptionExpiresAt.getTime() <= now.getTime()
+    ) {
+      // Subscription has expired by date -> reset subscription fields & credits
+      user.plan = 'free';
+      user.subscriptionStartedAt = null;
+      user.subscriptionExpiresAt = null;
+      user.remainCredits = '0';
+      user.totalCredit = '0';
+      await user.save();
+    }
 
-    user.remainCredits = '0';
-    user.totalCredit = '0';
-
-    await user.save(); // ✅ OK
-  }
-
-  return user;
-}
-
-async consumeScan(userId: string): Promise<UserDocument> {
-  const user = await this.ensureSubscriptionValid(userId);
-
-  // Unlimited subscription
-  if (user.remainCredits === '-1') {
     return user;
   }
 
-  let subRemain = parseInt(user.remainCredits || '0', 10);
-  if (subRemain > 0) {
-    user.remainCredits = String(subRemain - 1);
-    await user.save(); // ✅ OK
-    return user;
+  async consumeScan(userId: string): Promise<UserDocument> {
+    const user = await this.ensureSubscriptionValid(userId);
+
+    // 1) If subscription is unlimited
+    if (user.remainCredits === '-1') {
+      // unlimited subscription -> do nothing
+      return user;
+    }
+
+    // 2) Subscription credits first
+    let subRemain = parseInt(user.remainCredits ?? '0', 10);
+    if (subRemain > 0) {
+      subRemain -= 1;
+      user.remainCredits = String(subRemain);
+      await user.save();
+      return user;
+    }
+
+    // 3) Then lifetime credits
+    let lifeRemain = parseInt(user.lifetimeRemainCredits ?? '0', 10);
+    if (lifeRemain > 0) {
+      lifeRemain -= 1;
+      user.lifetimeRemainCredits = String(lifeRemain);
+      await user.save();
+      return user;
+    }
+
+    // 4) Nothing left
+    throw new BadRequestException('No scan credits available');
   }
 
-  let lifeRemain = parseInt(user.lifetimeRemainCredits || '0', 10);
-  if (lifeRemain > 0) {
-    user.lifetimeRemainCredits = String(lifeRemain - 1);
-    await user.save(); // ✅ OK
-    return user;
-  }
-
-  throw new BadRequestException('No scan credits available');
-}
 
 }

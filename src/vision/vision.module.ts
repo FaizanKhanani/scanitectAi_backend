@@ -9,6 +9,7 @@ import { TranslationModule } from "../translation/translate.module";
 import { FilesModule } from "../files/files.module";
 import { VisionService } from './vision.service';
 import { CommonModule } from '../common/common.module';
+import { PricingModule } from '../pricing/pricing.module';
 
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { CommonModule } from '../common/common.module';
     MongooseModule.forFeature([{ name: Place.name, schema: PlaceSchema }]),
     UserModule,
     TranslationModule,
-    CommonModule, // ✅ Add this
+    CommonModule, 
+    PricingModule,
   ],
   controllers: [VisionController],
   providers: [VisionService],
