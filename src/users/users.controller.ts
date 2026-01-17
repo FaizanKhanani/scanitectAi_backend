@@ -44,6 +44,7 @@ import { AuthGuard } from "../common/guards/at.guard";
 import { ApiOperation, ApiResponse, ApiTags, ApiConsumes, ApiBody  } from "@nestjs/swagger";
 import { v4 as uuid } from 'uuid';
 import { EmailService } from '../common/service/mail.service';
+import { TranslationService } from '../translation/translate.service';
 
 
 export const imageFileFilter = (
@@ -62,56 +63,144 @@ export const imageFileFilter = (
 export class UserController {
   constructor(private readonly userService: UserService,
     private readonly logger: LoggerService,
-    private readonly mailer: EmailService) { }
+    private readonly mailer: EmailService,
+     private readonly translationService: TranslationService, 
+  
+  ) { }
 
-  @ApiOperation({
+
+
+
+
+  // @ApiOperation({
+  //   summary: "Create user",
+  //   description: "User signup app",
+  // })
+  // @ApiResponse(userSuccessResponse)
+  // @ApiResponse(userErrorResponse)
+  // @Public()
+  // @Post()
+  // @UseFilters(new HttpExceptionFilter())
+  // @UsePipes(new ValidationPipe({ transform: true }))
+  // async create(
+  //   @Body() createCatDto: CreateUserDto,
+  //   @Res() res: Response
+  // ): Promise<responseData> {
+  //   const id: string = uuid();
+  //   this.logger.log('User create api called', id, 'users.controler.ts', 'POST', '/users', 'create');
+  //   const findUser = await this.userService.findOneUser(createCatDto.email);
+
+  //   console.log("the finduser",findUser )
+  //   if((!findUser) || (findUser && !findUser?.isEmailVerify)){
+  //   // if(!findUser){
+  //     console.log("the data is",createCatDto, "the typeof ", typeof(createCatDto) )
+  //   const user = await this.userService.create(createCatDto);
+
+  //   const isMAil = process.env.IS_EMAIL
+  //   console.log('##############', isMAil)
+  //   if (isMAil === "True") {
+  //     console.log("the email", user.email,"otp",user.otp)
+  //     await this.mailer.sendEmailVerification(user.email, user.otp)
+  //   }
+  //   return sendResponse(
+  //     res,
+  //     HttpStatus.CREATED,
+  //     statusMessage[HttpStatus.CREATED],
+  //     true,
+  //     user
+  //   );
+  // }
+  // else{
+  //     return sendResponse(
+  //     res,
+  //     HttpStatus.FORBIDDEN,
+  //     statusMessage[HttpStatus.FORBIDDEN],
+  //     false,
+  //     {message: "user from this email is already created"}
+  //   ); 
+  // }
+  // }
+
+
+
+
+
+
+
+ @ApiOperation({
     summary: "Create user",
     description: "User signup app",
   })
   @ApiResponse(userSuccessResponse)
   @ApiResponse(userErrorResponse)
   @Public()
-  @Post()
+    @Post()
   @UseFilters(new HttpExceptionFilter())
   @UsePipes(new ValidationPipe({ transform: true }))
   async create(
-    @Body() createCatDto: CreateUserDto,
+    @Body() body: { data: CreateUserDto; lang?: string },
     @Res() res: Response
   ): Promise<responseData> {
+    const { data: createCatDto, lang } = body;  
+
+    const targetLang = lang || 'en';               
     const id: string = uuid();
-    this.logger.log('User create api called', id, 'users.controler.ts', 'POST', '/users', 'create');
+    this.logger.log(
+      'User create api called',
+      id,
+      'users.controler.ts',
+      'POST',
+      '/users',
+      'create',
+    );
+console.log("the data", createCatDto ,"ddd", lang )
     const findUser = await this.userService.findOneUser(createCatDto.email);
 
-    console.log("the finduser",findUser )
-    if((!findUser) || (findUser && !findUser?.isEmailVerify)){
-    // if(!findUser){
-      console.log("the data is",createCatDto, "the typeof ", typeof(createCatDto) )
-    const user = await this.userService.create(createCatDto);
+    if ((!findUser) || (findUser && !findUser?.isEmailVerify)) {
+      const user = await this.userService.create(createCatDto);
 
-    const isMAil = process.env.IS_EMAIL
-    console.log('##############', isMAil)
-    if (isMAil === "True") {
-      console.log("the email", user.email,"otp",user.otp)
-      await this.mailer.sendEmailVerification(user.email, user.otp)
-    }
-    return sendResponse(
-      res,
-      HttpStatus.CREATED,
-      statusMessage[HttpStatus.CREATED],
-      true,
-      user
-    );
-  }
-  else{
+      const isMAil = process.env.IS_EMAIL;
+      if (isMAil === 'True') {
+        await this.mailer.sendEmailVerification(user.email, user.otp);
+      }
+
+    
       return sendResponse(
-      res,
-      HttpStatus.FORBIDDEN,
-      statusMessage[HttpStatus.FORBIDDEN],
-      false,
-      {message: "user from this email is already created"}
-    ); 
+        res,
+        HttpStatus.CREATED,
+        statusMessage[HttpStatus.CREATED],
+        true,
+        user,
+      );
+    } else {
+   console.log("the find user", findUser)
+      console.log("the error block")
+      // ---- translate error message ----
+      const baseError = 'user from this email is already created';
+
+    //  const errorMessage =  await this.translationService.translate(baseError, targetLang);
+      const errorMessage =
+        targetLang === 'en'
+          ? baseError
+          : await this.translationService.translate(baseError, targetLang);
+
+console.log("the error message", errorMessage)
+
+      return sendResponse(
+        res,
+        HttpStatus.FORBIDDEN,
+        statusMessage[HttpStatus.FORBIDDEN],
+        false,
+        { message: errorMessage || baseError },
+      );
+    }
   }
-  }
+
+
+
+
+
+
 
 
 

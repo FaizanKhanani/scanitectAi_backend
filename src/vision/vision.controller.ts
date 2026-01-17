@@ -3289,6 +3289,55 @@ async recognizeWithLenss(
 
 
 
+// @UseGuards(AuthGuard)
+// @Get('get-scan-serp/:id')
+// async getSingleScanSerp(
+//   @Param('id') id: string,
+//   @Req() req,
+//   @Res() res: Response,
+// ) {
+//   try {
+//     // 1) Get SERP/Lens scan detail by id
+//     const getScanDetail = await this.visionService.getScansDetailsSerp(id);
+
+
+// console.log("the scan detail", getScanDetail)
+//     if (getScanDetail.status !== 200) {
+//       return res.status(400).json({
+//         status: getScanDetail.status,
+//         message: getScanDetail.message,
+//         data: getScanDetail.error,
+//       });
+//     }
+
+//     // 2) Get user language
+//     const userId = req.user.sub;
+//     const user = await this.userService.findOne(userId);
+
+//     // 3) Translate the serp scan detail to user.languageCode (if needed)
+//     const translated = await this.translationService.translate(
+//       getScanDetail.scanDetail,   
+//       user.languageCode,
+//     );
+
+//     // 4) Return translated serp scan detail
+//     return res.status(200).json({
+//       status: getScanDetail.status,
+//       message: getScanDetail.message,
+//       data: translated,
+//     });
+//   } catch (error) {
+//     console.error('Error in getSingleScanSerp:', error);
+
+//     return res.status(502).json({
+//       status: 502,
+//       message: 'Failed to translate serp scan detail',
+//     });
+//   }
+// }
+
+
+
 @UseGuards(AuthGuard)
 @Get('get-scan-serp/:id')
 async getSingleScanSerp(
@@ -3300,8 +3349,7 @@ async getSingleScanSerp(
     // 1) Get SERP/Lens scan detail by id
     const getScanDetail = await this.visionService.getScansDetailsSerp(id);
 
-
-console.log("the scan detail", getScanDetail)
+    console.log('the scan detail', getScanDetail);
     if (getScanDetail.status !== 200) {
       return res.status(400).json({
         status: getScanDetail.status,
@@ -3314,13 +3362,25 @@ console.log("the scan detail", getScanDetail)
     const userId = req.user.sub;
     const user = await this.userService.findOne(userId);
 
-    // 3) Translate the serp scan detail to user.languageCode (if needed)
+    // Normalize language code (e.g. "en-US" -> "en")
+    const langCodeRaw = user?.languageCode || 'en';
+    const langCode = langCodeRaw.toLowerCase().split(/[-_]/)[0]; // "en-US" -> "en"
+
+    // 3) If English, skip translation completely
+    if (langCode === 'en') {
+      return res.status(200).json({
+        status: getScanDetail.status,
+        message: getScanDetail.message,
+        data: getScanDetail.scanDetail, // send original data
+      });
+    }
+
+    // 4) Otherwise, translate to user.languageCode
     const translated = await this.translationService.translate(
-      getScanDetail.scanDetail,   // place detail (with ai fields)
-      user.languageCode,
+      getScanDetail.scanDetail,
+      langCodeRaw, // or langCode, depending on what you store
     );
 
-    // 4) Return translated serp scan detail
     return res.status(200).json({
       status: getScanDetail.status,
       message: getScanDetail.message,
@@ -3329,12 +3389,64 @@ console.log("the scan detail", getScanDetail)
   } catch (error) {
     console.error('Error in getSingleScanSerp:', error);
 
+    // Fallback: send original (English) data if we still have it
     return res.status(502).json({
       status: 502,
       message: 'Failed to translate serp scan detail',
     });
   }
 }
+
+
+
+
+// @ApiOperation({
+//   summary: 'fetch (Serp)',
+//   description: 'Get scan summary of specific user (Serp version)',
+// })
+// @ApiResponse({
+//   status: 200,
+//   description: 'Get scan summary of specific user successfully',
+// })
+// @ApiResponse({ status: 403, description: 'Forbidden.' })
+// @UseGuards(AuthGuard)
+// @Get('get-scans-serp')
+// @UseFilters(new HttpExceptionFilter())
+// async getScansSerp(@Req() req, @Res() res: Response): Promise<any> {
+//   const userId = req.user.sub;
+//   console.log('the user is in getScansSerp', userId);
+
+//   const response = await this.userService.getScansId(userId);
+//   console.log('the response in getScansSerp', response);
+
+//   if (response.status === 200) {
+//     // New summary method
+//     const getScansSummary = await this.visionService.getScansSummarySerp(
+//       response.scanAreas,
+//     );
+
+//     const user = await this.userService.findOne(userId);
+
+//     const translated = await this.translationService.translate(
+//       getScansSummary.scans,
+//       user.languageCode,
+//     );
+
+//     console.log('the translated (Serp)', translated);
+
+//     return res.status(200).json({
+//       status: 200,
+//       message: getScansSummary.message,
+//       data: translated,
+//     });
+//   }
+
+//   return res.status(400).json({
+//     status: 400,
+//     message: 'failed',
+//     data: 'error in getting the scan details',
+//   });
+// }
 
 
 
@@ -3358,34 +3470,49 @@ async getScansSerp(@Req() req, @Res() res: Response): Promise<any> {
   const response = await this.userService.getScansId(userId);
   console.log('the response in getScansSerp', response);
 
-  if (response.status === 200) {
-    // New summary method
-    const getScansSummary = await this.visionService.getScansSummarySerp(
-      response.scanAreas,
-    );
-
-    const user = await this.userService.findOne(userId);
-
-    const translated = await this.translationService.translate(
-      getScansSummary.scans,
-      user.languageCode,
-    );
-
-    console.log('the translated (Serp)', translated);
-
-    return res.status(200).json({
-      status: 200,
-      message: getScansSummary.message,
-      data: translated,
+  if (response.status !== 200) {
+    return res.status(400).json({
+      status: 400,
+      message: 'failed',
+      data: 'error in getting the scan details',
     });
   }
 
-  return res.status(400).json({
-    status: 400,
-    message: 'failed',
-    data: 'error in getting the scan details',
+  // 1) Get summary data
+  const getScansSummary = await this.visionService.getScansSummarySerp(
+    response.scanAreas,
+  );
+
+  // 2) Get user + language
+  const user = await this.userService.findOne(userId);
+
+  // Normalize language code, e.g. "en-US" -> "en"
+  const langCodeRaw = user?.languageCode || 'en';
+  const langCode = langCodeRaw.toLowerCase().split(/[-_]/)[0];
+
+  // 3) If English, skip translation and return original scans
+  if (langCode === 'en') {
+    console.log("in lang code ")
+    return res.status(200).json({
+      status: 200,
+      message: getScansSummary.message,
+      data: getScansSummary.scans,
+    });
+  }
+
+  // 4) For other languages, translate
+  const translated = await this.translationService.translate(
+    getScansSummary.scans,
+    langCodeRaw, // or langCode; both will work with your service
+  );
+
+  console.log('the translated (Serp)', translated);
+
+  return res.status(200).json({
+    status: 200,
+    message: getScansSummary.message,
+    data: translated,
   });
 }
-
 
 }

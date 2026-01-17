@@ -8,6 +8,7 @@ import { RefresToken, RefresTokenSchema } from "./schemas/refreshtoken.schema";
 // import { EmailService } from '../common/service/mail.service';
 import { CommonModule } from '../common/common.module';
 import { FilesModule } from '../files/files.module';
+import {TranslationModule } from '../translation/translate.module'
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { FilesModule } from '../files/files.module';
     ]),
     FilesModule,
     CommonModule, // ✅ Add this
+    TranslationModule
   ],
   controllers: [UserController],
   providers: [UserService],
