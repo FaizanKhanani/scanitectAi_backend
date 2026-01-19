@@ -27,11 +27,7 @@ export class PricingController {
 
   @Post('test-scan')
   async testScan(@Body() body: TestScanDto) {
-    // This will:
-    // 1. Auto-expire subscription if 1 month passed
-    // 2. Use subscription credits (or unlimited) first
-    // 3. Then lifetime credits
-    // 4. Throw error if nothing left
+
     const user = await this.pricingService.consumeScan(body.userId);
 
     return {

@@ -9,6 +9,24 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { BuyPackageDto } from './dto/buy-package.dto';
 import { PACKAGE_CONFIG, PackageConfig, PackageName } from './package-config';
 
+
+
+// Map incoming productId (from App Store / Play) -> your existing package-config keys
+const PRODUCT_ID_TO_PACKAGE: Record<string, PackageName> = {
+  // iOS (non‑renewing product IDs from App Store Connect)
+  starter_subs_month_ios: 'basic_sub_month',
+  explorer_subs_month_ios: 'explorer_sub_month',
+  unlimited_sub_month_ios: 'unlimited_sub_month',
+
+  // Android (already canonical, but safe to include)
+  basic_sub_month: 'basic_sub_month',
+  explorer_sub_month: 'explorer_sub_month',
+  unlimited_sub_month: 'unlimited_sub_month',
+};
+
+
+
+
 @Injectable()
 export class PricingService {
   constructor(
@@ -16,57 +34,32 @@ export class PricingService {
   ) {}
 
   // Called from React Native after in‑app purchase is verified
-  async buyPackage(dto: BuyPackageDto): Promise<User> {
-    const user = await this.userModel.findById(dto.userId);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+async buyPackage(dto: BuyPackageDto): Promise<User> {
+  const user = await this.userModel.findById(dto.userId);
+  if (!user) throw new NotFoundException('User not found');
 
-    const config = PACKAGE_CONFIG[dto.packageName as PackageName];
-    if (!config) {
-      throw new BadRequestException('Invalid package name');
-    }
-
-    if (config.type === 'subscription') {
-      return this.applySubscriptionPackage(user, dto.packageName, config);
-    }
-
-    if (config.type === 'lifetime') {
-      return this.applyLifetimePackage(user, dto.packageName, config);
-    }
-
-    throw new BadRequestException('Unknown package type');
+  // Map iOS product ID to your canonical package name; Android stays the same
+  const canonicalName = PRODUCT_ID_TO_PACKAGE[dto.packageName] as PackageName | undefined;
+  if (!canonicalName) {
+    throw new BadRequestException('Invalid package name');
   }
 
-  // -------- SUBSCRIPTION LOGIC --------
-//   private async applySubscriptionPackage(
-//     user: UserDocument,
-//     packageName: PackageName,
-//     config: { credits: number | 'unlimited'; durationInDays?: number },
-//   ): Promise<User> {
-//     const now = new Date();
-//     const expiresAt = new Date(now);
-//     if (!config.durationInDays) {
-//       throw new Error('Subscription package must have durationInDays');
-//     }
-//     expiresAt.setDate(expiresAt.getDate() + config.durationInDays);
+  const config = PACKAGE_CONFIG[canonicalName];
+  if (!config) {
+    throw new BadRequestException('Package not configured');
+  }
 
-//     user.plan = packageName; // e.g. 'basic_sub_month'
-//     user.subscriptionStartedAt = now;
-//     user.subscriptionExpiresAt = expiresAt;
+  if (config.type === 'subscription') {
+    return this.applySubscriptionPackage(user, canonicalName, config);
+  }
 
-//     if (config.credits === 'unlimited') {
-//       // -1 = unlimited sentinel
-//       user.totalCredit = '-1';
-//       user.remainCredits = '-1';
-//     } else {
-//       user.totalCredit = String(config.credits);
-//       user.remainCredits = String(config.credits);
-//     }
+  if (config.type === 'lifetime') {
+    return this.applyLifetimePackage(user, canonicalName, { credits: config.credits });
+  }
 
-//     await user.save();
-//     return user;
-//   }
+  throw new BadRequestException('Unknown package type');
+}
+
 
 
 
@@ -163,60 +156,6 @@ private async applySubscriptionPackage(
     return user;
   }
 
-  // -------- AUTO-EXPIRE SUBSCRIPTIONS --------
-//   async ensureSubscriptionValid(userId: string): Promise<User> {
-//     const user = await this.userModel.findById(userId);
-//     if (!user) throw new NotFoundException('User not found');
-
-//     if (
-//       user.subscriptionExpiresAt &&
-//       user.subscriptionExpiresAt.getTime() < Date.now()
-//     ) {
-//       // subscription expired -> clear ONLY subscription credits
-//       user.plan = 'free';
-//       user.subscriptionStartedAt = null;
-//       user.subscriptionExpiresAt = null;
-
-//       user.remainCredits = '0';
-//       user.totalCredit = '0';
-
-//       await user.save();
-//     }
-//     return user;
-//   }
-
-//   // -------- OPTIONAL: USE ONE SCAN --------
-//   // Call this whenever user performs a scan
-//   async consumeScan(userId: string): Promise<User> {
-//     let user = await this.ensureSubscriptionValid(userId);
-
-//     // 1) If subscription is unlimited
-//     if (user.remainCredits === '-1') {
-//       // unlimited subscription -> do nothing
-//       return user;
-//     }
-
-//     // 2) If subscription has remaining credits, use those first
-//     let subRemain = parseInt(user.remainCredits || '0', 10);
-//     if (subRemain > 0) {
-//       subRemain -= 1;
-//       user.remainCredits = String(subRemain);
-//       await user.save();
-//       return user;
-//     }
-
-//     // 3) Otherwise use lifetime credits
-//     let lifeRemain = parseInt(user.lifetimeRemainCredits || '0', 10);
-//     if (lifeRemain > 0) {
-//       lifeRemain -= 1;
-//       user.lifetimeRemainCredits = String(lifeRemain);
-//       await user.save();
-//       return user;
-//     }
-
-//     // 4) No credits left
-//     throw new BadRequestException('No scan credits available');
-//   }
 
 
   async ensureSubscriptionValid(userId: string): Promise<UserDocument> {
