@@ -28,6 +28,8 @@
 
 import { Body, Controller, Post } from '@nestjs/common';
 import { TranslationService } from './translate.service'; // adjust path if name differs
+import { TranslateToastDto } from './dto/translateToast.dto';
+import { Public } from "../common/decorators";
 
 @Controller('places') // -> /places
 export class TranslateController {
@@ -43,8 +45,21 @@ export class TranslateController {
     return { data: translated };
   }
 
+  @Public()
+  @Post('translateToast')
+  async translateToast(
+    @Body() dto: TranslateToastDto,
+  ): Promise<{ translations: string[] }> {
+    const { texts, targetLang } = dto;
+  console.log("the ",texts,"      ", targetLang)
+    const translations = await this.translationService.translateToast(
+      texts,
+      targetLang,
+    );
 
-
+    // Always return 200 with translations (possibly same as originals)
+    return { translations };
+  }
 
 
 

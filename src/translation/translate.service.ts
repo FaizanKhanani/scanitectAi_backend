@@ -372,13 +372,14 @@
 
 
 // src/translation/translation.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger  } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 
 @Injectable()
 export class TranslationService {
+  private readonly logger = new Logger(TranslationService.name);
   private readonly apiUrl =
     'https://translation.googleapis.com/language/translate/v2';
 
@@ -492,6 +493,8 @@ export class TranslationService {
    * Errors are handled by the caller (translate()).
    */
   private async translateData<T = any>(data: T, targetLang: string): Promise<T> {
+
+    console.log("the data", data)
     // 1. Collect all strings
     const itemsToTranslate: { path: (string | number)[]; value: string }[] = [];
     this.collectStrings(data, [], itemsToTranslate);
@@ -511,12 +514,14 @@ export class TranslationService {
         format: 'text',
       },
     );
-
+  console.log("first", response$)
     const response = await firstValueFrom(response$);
+     console.log("second", response)
     const translations: { translatedText: string }[] =
       response.data.data.translations;
 
     if (!translations || translations.length !== itemsToTranslate.length) {
+      console.log("Unexpected translation response from Google API")
       throw new Error('Unexpected translation response from Google API');
     }
 
@@ -534,6 +539,8 @@ export class TranslationService {
         this.setValueAtPath(result, item.path, translated);
       }
     });
+
+    console.log("the end resulr", result)
 
     return result as T;
   }
@@ -598,5 +605,70 @@ export class TranslationService {
     }
 
     current[lastKey] = value;
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+    async translateToast(texts: string[], targetLang: string): Promise<string[]> {
+    const cleanTexts = (texts || []).map((t) => (t == null ? '' : String(t)));
+    if (cleanTexts.length === 0) return cleanTexts;
+
+    // Normalize language, e.g. "fr-FR" -> "fr"
+    const lang = (targetLang || 'en').split('-')[0].toLowerCase();
+
+    // If target is English, skip Google and just return originals
+    if (lang === 'en') {
+      return cleanTexts;
+    }
+
+    const apiKey = process.env.GOOGLE_TRANSLATION_API
+    if (!apiKey) {
+      this.logger.error('GOOGLE_TRANSLATE_API_KEY is not configured');
+      // return originals instead of breaking UX
+      return cleanTexts;
+      // or: throw new InternalServerErrorException('Translation is not configured.');
+    }
+
+    try {
+      const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
+
+      const response = await firstValueFrom(
+        this.http.post(url, {
+          q: cleanTexts,    // IMPORTANT: array of strings
+          target: lang,
+          format: 'text',
+        }),
+      );
+
+      const data = response.data;
+      const translations = data?.data?.translations || [];
+
+      // Map each original text to its translation (or original if missing)
+      const result = cleanTexts.map((original, index) => {
+        const translated = translations[index]?.translatedText;
+        return translated || original;
+      });
+
+      return result;
+    } catch (err: any) {
+      // Log backend-side error for debugging
+      this.logger.warn(
+        `Google Translate failed, falling back to originals: ${
+          err?.response?.data ? JSON.stringify(err.response.data) : err?.message || err
+        }`,
+      );
+
+      // UX-friendly: return original texts instead of throwing
+      return cleanTexts;
+    }
   }
 }
