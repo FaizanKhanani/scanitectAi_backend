@@ -2785,7 +2785,7 @@ async recognizeWithLenss(
     return res.status(400).json({
       status: 400,
       message: 'NO_CREDITS',
-      data: 'You have no scan credits left. Please purchase a subscription or pack.',
+      data: 'You are out of scan credits',
     });
   }
   // ================================================================
@@ -2841,7 +2841,7 @@ async recognizeWithLenss(
 
     try {
       const [nearbyPlaces, areaName] = await Promise.all([
-        this.visionService.getNearbyPlacesSerp(userLat, userLon, 10000),
+        this.visionService.getNearbyPlacesSerp(userLat, userLon, 1000),
         this.visionService.getAreaNameFromCoords(userLat, userLon),
       ]);
 

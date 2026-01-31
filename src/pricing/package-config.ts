@@ -18,12 +18,12 @@ export const PACKAGE_CONFIG: Record<PackageName, PackageConfig> = {
   // ===== CURRENT MONTHLY SUBSCRIPTIONS =====
   basic_sub_month: {
     type: 'subscription',
-    credits: 25,
+    credits: 20,
     durationInDays: 30,
   },
   explorer_sub_month: {
     type: 'subscription',
-    credits: 100,
+    credits: 50,
     durationInDays: 30,
   },
   unlimited_sub_month: {

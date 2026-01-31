@@ -44,7 +44,13 @@ type GeoPoint = { type: 'Point'; coordinates: [number, number] };
   };
 
 
-
+type NearbyPlace = {
+  id: string;
+  title: string;
+  location: string | null;
+  thumbnailImage: string | null;
+  // category?: string; // uncomment if you want to tag by your label
+};
 
 type LandmarkOut = {
   name: string;
@@ -2952,87 +2958,13 @@ console.log("the area name", areaName)
 
 
 
-  // vision.service.ts (inside VisionService)
-// vision.service.ts (inside VisionService)
-
-// async getNearbyPlacesSerp(
-//   lat: number,
-//   lon: number,
-//   radiusMeters = 3000,  // 3 km
-//   limit = 10,
-// ) {
-//   // 1) First try your own places collection (MongoDB)
-//   const docs = await this.placeModel
-//     .find({
-//       coordinates: {
-//         $near: {
-//           $geometry: {
-//             type: 'Point',
-//             coordinates: [lon, lat], // [lng, lat]
-//           },
-//           $maxDistance: radiusMeters,
-//         },
-//       },
-//     })
-//     .limit(limit)
-//     .lean<any>();
-
-//   const dbResults = docs.map((p) => ({
-//     id: String(p._id),
-//     title: p.ai?.title || p.title || 'Unknown place',
-//     location: p.ai?.location || null,
-//     thumbnailImage:
-//       p.images?.local_thumbnail ||
-//       p.images?.thumbnail ||
-//       p.images?.original ||
-//       null,
-//   }));
-
-//   // If we have at least 5 from our DB, that's enough
-//   if (dbResults.length >= 5) {
-//     return dbResults.slice(0, limit);
-//   }
-
-//   // 2) Top-up using free OpenStreetMap Overpass API
-//   const remaining = limit - dbResults.length;
-
-//   let osmResults: {
-//     id: string;
-//     title: string;
-//     location: string | null;
-//     thumbnailImage: string | null;
-//   }[] = [];
-
-//   try {
-//     osmResults = await this.fetchNearbyFromOSM(lat, lon, radiusMeters, remaining);
-//   } catch (e) {
-//     console.error('[OSM] nearby fetch failed:', e);
-//     // ignore OSM failure, just return what we have from DB
-//     return dbResults;
-//   }
-
-//   // 3) Deduplicate by title (case-insensitive)
-//   const existingTitles = new Set(
-//     dbResults.map((r) => (r.title || '').toLowerCase()),
-//   );
-
-//   const dedupedOsm = osmResults.filter((r) => {
-//     const t = (r.title || '').toLowerCase();
-//     if (!t) return false;
-//     if (existingTitles.has(t)) return false;
-//     existingTitles.add(t);
-//     return true;
-//   });
-
-//   return [...dbResults, ...dedupedOsm];
-// }
 
 
 
 async getNearbyPlacesSerp(
   lat: number,
   lon: number,
-  radiusMeters = 10000,  // 3 km
+  radiusMeters = 1000,  // 3 km
   limit = 10,
 ) {
   // 1) First try your own places collection (MongoDB)
@@ -3077,6 +3009,7 @@ async getNearbyPlacesSerp(
   }[] = [];
 
   try {
+    console.log("the radius meter",radiusMeters )
     googleResults = await this.fetchNearbyFromGooglePlaces(
       lat,
       lon,
@@ -3112,78 +3045,240 @@ async getNearbyPlacesSerp(
 
 
 
-// vision.service.ts (inside VisionService)
+// Optional: extend the return type if you want to keep the category
 
-// vision.service.ts (inside VisionService)
 
-// private async fetchNearbyFromOSM(
+private async fetchNearbyFromGooglePlaces(
+  lat: number,
+  lon: number,
+  radiusMeters: number,
+  limit: number,
+): Promise<NearbyPlace[]> {
+  if (limit <= 0) return [];
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    console.error('[GooglePlaces] Missing GOOGLE_MAPS_API_KEY');
+    return [];
+  }
+
+  const url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
+
+  // Max 1km
+  const radius = Math.min(radiusMeters, 1000);
+
+  const CATEGORY_QUERIES: { label: string; type?: string; keyword?: string }[] = [
+    { label: 'Night Club', type: 'night_club' },
+    { label: 'Restaurant', type: 'restaurant' },
+    { label: 'Shopping Mall', type: 'shopping_mall' },
+    { label: 'Theater', type: 'tourist_attraction', keyword: 'theater' },
+    { label: 'Museum', type: 'museum' },
+    { label: 'Art Gallery', type: 'art_gallery' },
+    { label: 'Historical Monument', type: 'tourist_attraction', keyword: 'historical monument' },
+    { label: 'Heritage Site', type: 'tourist_attraction', keyword: 'heritage site' },
+    { label: 'Archaeological Site', type: 'tourist_attraction', keyword: 'archaeological site' },
+    { label: 'Landmark', type: 'tourist_attraction', keyword: 'landmark' },
+    { label: 'Palace', type: 'tourist_attraction', keyword: 'palace' },
+    { label: 'Castle', type: 'tourist_attraction', keyword: 'castle' },
+    { label: 'Temple', type: 'tourist_attraction', keyword: 'temple' },
+    { label: 'Church / Cathedral', type: 'church' },
+    { label: 'Mosque', type: 'mosque' },
+
+    { label: 'Amusement Park', type: 'amusement_park' },
+    { label: 'Theme Park', type: 'amusement_park', keyword: 'theme park' },
+    { label: 'Water Park', type: 'amusement_park', keyword: 'water park' },
+    { label: 'Zoo', type: 'zoo' },
+    { label: 'Aquarium', type: 'aquarium' },
+    { label: 'Safari Park', type: 'zoo', keyword: 'safari park' },
+
+    { label: 'Botanical Garden', type: 'tourist_attraction', keyword: 'botanical garden' },
+    { label: 'National Park', type: 'park', keyword: 'national park' },
+    { label: 'Wildlife Sanctuary', type: 'park', keyword: 'wildlife sanctuary' },
+    { label: 'Beach', type: 'tourist_attraction', keyword: 'beach' },
+    { label: 'Island', type: 'tourist_attraction', keyword: 'island' },
+    { label: 'Mountain', type: 'tourist_attraction', keyword: 'mountain' },
+    { label: 'Hill Station', type: 'tourist_attraction', keyword: 'hill station' },
+    { label: 'Desert', type: 'tourist_attraction', keyword: 'desert' },
+    { label: 'Lake', type: 'tourist_attraction', keyword: 'lake' },
+    { label: 'Waterfall', type: 'tourist_attraction', keyword: 'waterfall' },
+    { label: 'Scenic Viewpoint', type: 'tourist_attraction', keyword: 'viewpoint' },
+    { label: 'Nature Reserve', type: 'park', keyword: 'nature reserve' },
+    { label: 'Hot Springs', type: 'tourist_attraction', keyword: 'hot springs' },
+
+  
+    { label: 'Casino', type: 'casino' },
+    { label: 'Bar', type: 'bar' },
+    { label: 'Pub', type: 'bar', keyword: 'pub' },
+    { label: 'Lounge', type: 'bar', keyword: 'lounge' },
+
+  
+    { label: 'Café', type: 'cafe' },
+    { label: 'Street Food Market', type: 'restaurant', keyword: 'street food market' },
+    { label: 'Food Court', type: 'restaurant', keyword: 'food court' },
+    { label: 'Wine Tasting Venue', type: 'bar', keyword: 'wine tasting' },
+
+    { label: 'Shopping Mall', type: 'shopping_mall' },
+    { label: 'Local Bazaar / Market', type: 'tourist_attraction', keyword: 'market' },
+    { label: 'Cultural Village', type: 'tourist_attraction', keyword: 'cultural village' },
+    { label: 'Festival Ground', type: 'tourist_attraction', keyword: 'festival ground' },
+
+    { label: 'Theater', type: 'tourist_attraction', keyword: 'theater' },
+    { label: 'Opera House', type: 'tourist_attraction', keyword: 'opera house' },
+    { label: 'Cinema', type: 'movie_theater' },
+    { label: 'Concert Hall', type: 'tourist_attraction', keyword: 'concert hall' },
+
+    { label: 'Sports Stadium', type: 'stadium' },
+    { label: 'Cruise Terminal', type: 'tourist_attraction', keyword: 'cruise terminal' },
+  ];
+
+  // Deduplicate by place_id
+  const placeMap = new Map<string, { place: any; label: string }>();
+
+  for (const q of CATEGORY_QUERIES) {
+    if (placeMap.size >= limit) break;
+
+    const params: any = {
+      key: apiKey,
+      location: `${lat},${lon}`,
+      radius,
+    };
+    if (q.type) params.type = q.type;
+    if (q.keyword) params.keyword = q.keyword;
+
+    try {
+      const resp = await axios.get(url, { params, timeout: 10000 });
+
+      if (resp.data.status !== 'OK' && resp.data.status !== 'ZERO_RESULTS') {
+        console.error(
+          `[GooglePlaces] category=${q.label} type=${q.type} keyword=${q.keyword} error:`,
+          resp.data.status,
+          resp.data.error_message,
+        );
+        continue;
+      }
+
+      const results: any[] = resp.data.results || [];
+      if (!results.length) continue;
+
+      // === KEY CHANGE: only take the TOP 1 result for this category ===
+      const top = results[0];
+
+      if (top.place_id && !placeMap.has(top.place_id)) {
+        placeMap.set(top.place_id, { place: top, label: q.label });
+      }
+    } catch (e: any) {
+      console.error(
+        `[GooglePlaces] category=${q.label} type=${q.type} keyword=${q.keyword} failed:`,
+        e?.message || e,
+      );
+    }
+  }
+
+  const merged = Array.from(placeMap.values()).slice(0, limit);
+
+  return merged.map(({ place, label }) => ({
+    id: place.place_id,
+    title: place.name || 'Unknown place',
+    location: place.vicinity || place.formatted_address || null,
+    thumbnailImage: null,
+    // category: label,
+  }));
+}
+
+
+
+// private async fetchNearbyFromGooglePlaces(
 //   lat: number,
 //   lon: number,
-//   radiusMeters: number,
 //   limit: number,
 // ): Promise<
 //   { id: string; title: string; location: string | null; thumbnailImage: string | null }[]
 // > {
 //   if (limit <= 0) return [];
 
-//   // Overpass API endpoint (public, free; respect usage policy)
-//   const overpassUrl = 'https://overpass-api.de/api/interpreter';
-
-//   // Overpass QL query:
-//   // - look for tourism/historic/amenity POIs (nodes & ways) within radius
-//   // - you can tweak the tags to your liking
-//   const query = `
-//     [out:json][timeout:10];
-//     (
-//       node(around:${radiusMeters},${lat},${lon})["tourism"];
-//       node(around:${radiusMeters},${lat},${lon})["historic"];
-//       node(around:${radiusMeters},${lat},${lon})["amenity"="museum"];
-//       node(around:${radiusMeters},${lat},${lon})["amenity"="theatre"];
-//       node(around:${radiusMeters},${lat},${lon})["amenity"="place_of_worship"];
-//       way(around:${radiusMeters},${lat},${lon})["tourism"];
-//       way(around:${radiusMeters},${lat},${lon})["historic"];
-//     );
-//     out center ${limit};
-//   `.trim();
-
-//   const { data } = await axios.post(overpassUrl, query, {
-//     headers: {
-//       'Content-Type': 'text/plain',
-//       // set a real User-Agent per Overpass policy
-//       'User-Agent': 'ScanitectAI/1.0 (contact@yourdomain.com)',
-//     },
-//     timeout: 10000,
-//   });
-
-//   if (!data || !Array.isArray(data.elements)) {
+//   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+//   if (!apiKey) {
+//     console.error('[GooglePlaces] Missing GOOGLE_MAPS_API_KEY');
 //     return [];
 //   }
 
-//   // Map Overpass elements to our simple structure
-//   const results = data.elements
-//     .filter((el: any) => el.tags && el.tags.name)
-//     .slice(0, limit)
-//     .map((el: any) => {
-//       const tags = el.tags || {};
-//       const name = tags.name as string;
+//   const url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
 
-//       const locationText =
-//         tags['addr:city'] ||
-//         tags['addr:suburb'] ||
-//         tags['addr:district'] ||
-//         tags['addr:state'] ||
-//         null;
+//   // Fixed 1km radius
+//   const radius = 1000; // meters
 
-//       return {
-//         id: `osm-${el.type}-${el.id}`, // e.g. osm-node-12345
-//         title: name,
-//         location: locationText,
-//         thumbnailImage: null, // OSM has no direct image URL; you can later map to photos if needed
-//       };
-//     });
+//   // What you want around the building
+//   const QUERIES: { type?: string; keyword?: string }[] = [
+//     // Pizza shops specifically
+//     { type: 'restaurant', keyword: 'pizza' },
 
-//   return results;
+//     // Food & drinks
+//     { type: 'restaurant' },
+//     { type: 'cafe' },
+//     { type: 'bar' },
+
+//     // Activities / entertainment
+//     { type: 'casino' },
+//     { type: 'tourist_attraction' },
+//     { type: 'shopping_mall' },
+//     { type: 'movie_theater' },
+//     { type: 'bowling_alley' },
+//     { type: 'night_club' },
+//     { type: 'amusement_park' },
+//     { type: 'park' },
+//     { type: 'museum' },
+//   ];
+
+//   const placeMap = new Map<string, any>(); // dedupe by place_id
+
+//   for (const q of QUERIES) {
+//     if (placeMap.size >= limit) break;
+
+//     const params: any = {
+//       key: apiKey,
+//       location: `${lat},${lon}`,
+//       radius,
+//     };
+//     if (q.type) params.type = q.type;
+//     if (q.keyword) params.keyword = q.keyword;
+
+//     try {
+//       const resp = await axios.get(url, { params, timeout: 10000 });
+
+//       if (resp.data.status !== 'OK' && resp.data.status !== 'ZERO_RESULTS') {
+//         console.error(
+//           `[GooglePlaces] type=${q.type} keyword=${q.keyword} error:`,
+//           resp.data.status,
+//           resp.data.error_message,
+//         );
+//         continue;
+//       }
+
+//       const results: any[] = resp.data.results || [];
+//        console.log("the result of place near by user", results)
+//       for (const place of results) {
+//         if (!place.place_id || placeMap.has(place.place_id)) continue;
+//         placeMap.set(place.place_id, place);
+//         if (placeMap.size >= limit) break;
+//       }
+//     } catch (e: any) {
+//       console.error(
+//         `[GooglePlaces] type=${q.type} keyword=${q.keyword} failed:`,
+//         e?.message || e,
+//       );
+//     }
+//   }
+
+//   const merged = Array.from(placeMap.values()).slice(0, limit);
+
+//   return merged.map((place: any) => ({
+//     id: place.place_id,
+//     title: place.name || 'Unknown place',
+//     location: place.vicinity || place.formatted_address || null,
+//     thumbnailImage: null,
+//   }));
 // }
+
 
 
 // private async fetchNearbyFromGooglePlaces(
@@ -3196,8 +3291,6 @@ async getNearbyPlacesSerp(
 // > {
 //   if (limit <= 0) return [];
 
-// console.log("here un fetchNearbyFromGooglePlaces ", lat, lon)
-
 //   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 //   if (!apiKey) {
 //     console.error('[GooglePlaces] Missing GOOGLE_MAPS_API_KEY');
@@ -3205,149 +3298,81 @@ async getNearbyPlacesSerp(
 //   }
 
 //   const url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
-
-//   // Google caps radius at 50,000m for Nearby Search
 //   const radius = Math.min(radiusMeters, 50000);
 
-//   const params = {
-//     key: apiKey,
-//     location: `${lat},${lon}`,
-//     radius,
-//     // You can tweak these:
-//     // type: 'tourist_attraction',  // one place type
-//     keyword: 'tourist attraction museum historic landmark theatre church temple parks resturant shopping-malls monument',
-//   };
+//   // Types you care about
+//   const TYPES = [
+//     'tourist_attraction',
+//     'park',
+//     'museum',
+//     'lodging',        // hotels
+//     'shopping_mall',
+//     'restaurant',
+//     'cafe',
+//     'bar',
+//     'art_gallery',
+//     'zoo',
+//     'amusement_park',
+//     'aquarium',
+//     'movie_theater',
+//     'stadium',
+//     'church',
+//     'mosque',
+//     'hindu_temple',
+//     'synagogue',
+//   ] as const;
 
-//   const resp = await axios.get(url, { params, timeout: 10000 });
+//   const placeMap = new Map<string, any>(); // dedupe by place_id
 
-//   if (resp.data.status !== 'OK' && resp.data.status !== 'ZERO_RESULTS') {
-//     console.error('[GooglePlaces] API error:', resp.data.status, resp.data.error_message);
-//     return [];
+//   for (const type of TYPES) {
+//     if (placeMap.size >= limit) break;
+
+//     const params: any = {
+//       key: apiKey,
+//       location: `${lat},${lon}`,
+//       radius,
+//       type, // one type per request
+//     };
+
+//     try {
+//       const resp = await axios.get(url, { params, timeout: 10000 });
+
+//       if (resp.data.status !== 'OK' && resp.data.status !== 'ZERO_RESULTS') {
+//         console.error(
+//           `[GooglePlaces] type=${type} error:`,
+//           resp.data.status,
+//           resp.data.error_message,
+//         );
+//         continue;
+//       }
+
+//       const results: any[] = resp.data.results || [];
+
+//       for (const place of results) {
+//         if (!place.place_id || placeMap.has(place.place_id)) continue;
+//         placeMap.set(place.place_id, place);
+//         if (placeMap.size >= limit) break;
+//       }
+//     } catch (e: any) {
+//       console.error(`[GooglePlaces] type=${type} failed:`, e?.message || e);
+//     }
 //   }
 
-//   const results = (resp.data.results || []).slice(0, limit);
-//   console.log("the result is ", results)
-//   return results.map((place: any) => {
-//     return {
-//       id: place.place_id,
-//       title: place.name || 'Unknown place',
-//       location: place.vicinity || place.formatted_address || null,
-//       thumbnailImage: null, // no image
-//     };
-//   });
+//   const merged = Array.from(placeMap.values()).slice(0, limit);
+
+//   return merged.map((place: any) => ({
+//     id: place.place_id,
+//     title: place.name || 'Unknown place',
+//     location: place.vicinity || place.formatted_address || null,
+//     thumbnailImage: null,
+//   }));
 // }
-
-
-
-
-
-
-
-
-private async fetchNearbyFromGooglePlaces(
-  lat: number,
-  lon: number,
-  radiusMeters: number,
-  limit: number,
-): Promise<
-  { id: string; title: string; location: string | null; thumbnailImage: string | null }[]
-> {
-  if (limit <= 0) return [];
-
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) {
-    console.error('[GooglePlaces] Missing GOOGLE_MAPS_API_KEY');
-    return [];
-  }
-
-  const url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
-  const radius = Math.min(radiusMeters, 50000);
-
-  // Types you care about
-  const TYPES = [
-    'tourist_attraction',
-    'park',
-    'museum',
-    'lodging',        // hotels
-    'shopping_mall',
-    'restaurant',
-    'cafe',
-    'bar',
-    'art_gallery',
-    'zoo',
-    'amusement_park',
-    'aquarium',
-    'movie_theater',
-    'stadium',
-    'church',
-    'mosque',
-    'hindu_temple',
-    'synagogue',
-  ] as const;
-
-  const placeMap = new Map<string, any>(); // dedupe by place_id
-
-  for (const type of TYPES) {
-    if (placeMap.size >= limit) break;
-
-    const params: any = {
-      key: apiKey,
-      location: `${lat},${lon}`,
-      radius,
-      type, // one type per request
-    };
-
-    try {
-      const resp = await axios.get(url, { params, timeout: 10000 });
-
-      if (resp.data.status !== 'OK' && resp.data.status !== 'ZERO_RESULTS') {
-        console.error(
-          `[GooglePlaces] type=${type} error:`,
-          resp.data.status,
-          resp.data.error_message,
-        );
-        continue;
-      }
-
-      const results: any[] = resp.data.results || [];
-
-      for (const place of results) {
-        if (!place.place_id || placeMap.has(place.place_id)) continue;
-        placeMap.set(place.place_id, place);
-        if (placeMap.size >= limit) break;
-      }
-    } catch (e: any) {
-      console.error(`[GooglePlaces] type=${type} failed:`, e?.message || e);
-    }
-  }
-
-  const merged = Array.from(placeMap.values()).slice(0, limit);
-
-  return merged.map((place: any) => ({
-    id: place.place_id,
-    title: place.name || 'Unknown place',
-    location: place.vicinity || place.formatted_address || null,
-    thumbnailImage: null,
-  }));
-}
-
-
-
-
 
 
 
 private readonly openaiApiKey = process.env.OPENAI_API_KEY; // put your key in env
 private readonly openaiApiUrl = 'https://api.openai.com/v1/chat/completions';
 private readonly openaiModel = 'gpt-4.1-mini'; // or 'gpt-4.1', etc.
-
-
-
-
-
-
-
-
 
 
 
@@ -3605,20 +3630,6 @@ public async fetchPlacePhotosFromGoogle(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 public async getNearbyThingsFromGoogle(
   lat: number,
   lon: number,
@@ -3700,31 +3711,6 @@ public async getBuildingInfoFromChatGPT(
   }
 
   console.log("here reach", buildingName)
-
-//   const prompt = `
-// You are an expert travel writer and architectural historian.
-// Given the name of a building, output ONLY a JSON object with these fields:
-
-// {
-//   "name": string,
-//   "shortDescription": string,          // 3–5 sentences, general overview
-//   "tourismDescription": string,       // 4–8 sentences, from tourist perspective
-//   "funFacts": string[],               // list of short fun/interesting facts
-//   "heightMeters": number | null,      // height in meters if known, else null
-//   "latitude": number | null,          // decimal degrees if known, else null
-//   "longitude": number | null,         // decimal degrees if known, else null
-//   "architectureStyle": string | null  // e.g. "Gothic Revival"; null if unknown
-//   "architectName": string | null  // e.g. "Minoru Yamasaki"; null if unknown
-//   "location": string | null  // e.g. "Newyork"; null if unknown
-// }
-
-// Rules:
-// - If a value is unknown, use null for numbers and "" for strings, [] for funFacts.
-// - Do not add extra fields.
-// - Do not write anything before or after the JSON.
-
-// Building name: "${buildingName}"
-// `.trim();
 
 
 const prompt = `
@@ -3942,233 +3928,6 @@ Raw building text (may be noisy): "${buildingName}"
 
 
 
-
-
-
-
-
-
-
-// async findPlaceDetailSerp(PlaceName: string) {
-//   console.log('the place name', PlaceName);
-
-//   const getDetail = await this.placeModel
-//     .findOne({ title: PlaceName })
-//     .lean<PlaceResponseSerp>();
-
-//   console.log('the get detail is thisssssss', getDetail);
-
-//   if (!getDetail) return null;
-
-//   const wikipediaThumbImage = getDetail.images?.thumbnail;
-
-//   const thumbnailImage =
-//     getDetail.images?.local_thumbnail ||
-//     getDetail.images?.thumbnail ||
-//     undefined;
-
-//   const description =
-//     getDetail.description_long ||
-//     getDetail.ai?.tourismDescription ||
-//     getDetail.ai?.shortDescription ||
-//     '';
-
-//   const filteredDetail = {
-//     id: getDetail._id,
-//     title: getDetail.title,
-
-//     // raw Wikipedia / Lens images
-//     wikipediaThumbImage,
-
-//     // preferred images for UI
-//     thumbnailImage,
-//     originalImage: getDetail.raw.lensFirst.image,
-
-//     // description
-//     description,
-
-//     // Wikidata fields (may be empty for Lens-only docs)
-//     countries: getDetail.wikidata?.countries?.[0],
-//     administrativeAreas: getDetail.wikidata?.administrativeAreas?.[0],
-//     ranges: getDetail.wikidata?.ranges,
-//     instanceOf: getDetail.wikidata?.instanceOf,
-//     architects: getDetail.wikidata?.architects?.[0],
-//     coordinates: getDetail.coordinates?.coordinates,
-//     height: getDetail.wikidata?.height_m,
-
-//     // ChatGPT fields (for Lens docs)
-//     chatgptTitle: getDetail.ai?.title,
-//     aiShortDescription: getDetail.ai?.shortDescription,
-//     aiTourismDescription: getDetail.ai?.tourismDescription,
-//     aiFunFacts: getDetail.ai?.funFacts,
-//     aiHeightMeters: getDetail.ai?.heightMeters,
-//     aiLatitude: getDetail.ai?.latitude,
-//     aiLongitude: getDetail.ai?.longitude,
-//     aiArchitectureStyle: getDetail.ai?.architectureStyle,
-//     aiArchitectName: getDetail.ai?.architectName || '',
-//     aiLocation: getDetail.ai?.location || '',
-//   };
-
-//   return filteredDetail;
-// }
-
-
-
-
-// async findPlaceDetailByAiTitle(aiTitle: string) {
-//   console.log('findPlaceDetailByAiTitle:', aiTitle);
-
-//   const getDetail = await this.placeModel
-//     .findOne({ 'ai.title': aiTitle })
-//     .lean<PlaceResponseSerp>();
-
-//   console.log('getDetail by ai.title is', getDetail);
-
-//   if (!getDetail) return null;
-
-//   const wikipediaThumbImage = getDetail.images?.thumbnail;
-
-//   const thumbnailImage =
-//     getDetail.images?.local_thumbnail ||
-//     getDetail.images?.thumbnail ||
-//     undefined;
-
-//   const description =
-//     getDetail.description_long ||
-//     getDetail.ai?.tourismDescription ||
-//     getDetail.ai?.shortDescription ||
-//     '';
-
-//   const filteredDetail = {
-//     id: getDetail._id,
-//     title: getDetail.title,
-
-//     wikipediaThumbImage,
-//     thumbnailImage,
-//     originalImage: getDetail.raw.lensFirst.image,
-
-//     description,
-
-//     countries: getDetail.wikidata?.countries?.[0],
-//     administrativeAreas: getDetail.wikidata?.administrativeAreas?.[0],
-//     ranges: getDetail.wikidata?.ranges,
-//     instanceOf: getDetail.wikidata?.instanceOf,
-//     architects: getDetail.wikidata?.architects?.[0],
-//     coordinates: getDetail.coordinates?.coordinates,
-//     height: getDetail.wikidata?.height_m,
-
-//     chatgptTitle: getDetail.ai?.title,
-//     aiShortDescription: getDetail.ai?.shortDescription,
-//     aiTourismDescription: getDetail.ai?.tourismDescription,
-//     aiFunFacts: getDetail.ai?.funFacts,
-//     aiHeightMeters: getDetail.ai?.heightMeters,
-//     aiLatitude: getDetail.ai?.latitude,
-//     aiLongitude: getDetail.ai?.longitude,
-//     aiArchitectureStyle: getDetail.ai?.architectureStyle,
-//     aiArchitectName: getDetail.ai?.architectName || '',
-//     aiLocation: getDetail.ai?.location || '',
-//   };
-
-//   return filteredDetail;
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// async getScansDetailsSerp(id: string) {
-
-
-//   try {
-
-//     console.log("hrll", id, "type of", typeof(id))
-//     const place = await this.placeModel
-//       .findById(id)
-//       .lean<PlaceResponseSerp>(); // keep your type here
-
-//     if (!place) {
-//       return {
-//         status: 404,
-//         message: 'not_found',
-//         error: `Scan with id ${id} not found`,
-//       };
-//     }
-
-//     // Cast just for accessing raw.gpt (not in PlaceResponseSerp type)
-//     const placeAny = place as any;
-//     const gptRaw = placeAny.raw?.gpt;
-
-//     const scanDetail = {
-//       id: place._id,
-//       title: place.title,
-
-//       wikipediaThumbImage: place.images?.thumbnail,
-//       // wikipediaOriginalImage: place.images?.original,
-//       thumbnailImage: place.images?.local_thumbnail || place.images?.thumbnail,
-//       originalImage: place.raw.lensFirst.image,
-//       // originalImage: place.images?.local_original || place.images?.original,
-
-//       description:          // matches your place object
-//         place.ai?.tourismDescription ||
-//         place.ai?.shortDescription ||
-//         '',
-
-//       countries: place.wikidata?.countries?.[0],
-//       administrativeAreas: place.wikidata?.administrativeAreas?.[0],
-//       ranges: place.wikidata?.ranges,
-//       instanceOf: place.wikidata?.instanceOf,
-//       architects: place.wikidata?.architects?.[0],
-//       coordinates: place.coordinates?.coordinates,
-//       height: place.wikidata?.height_m,
-
-//       // GPT / AI fields
-//       chatgptTitle: place.ai?.title,
-//       aiShortDescription: place.ai?.shortDescription,
-//       aiTourismDescription: place.ai?.tourismDescription,
-//       aiFunFacts: place.ai?.funFacts,
-//       aiHeightMeters: place.ai?.heightMeters,
-//       aiLatitude: place.ai?.latitude,
-//       aiLongitude: place.ai?.longitude,
-//       aiArchitectureStyle: place.ai?.architectureStyle,
-
-//       // NEW: architect + location – prefer ai, fallback to raw.gpt
-//       aiArchitectName:
-//         place.ai?.architectName ??
-//         gptRaw?.architectName ??
-//         '',
-//       aiLocation:
-//         place.ai?.location ??
-//         gptRaw?.location ??
-//         '',
-//     };
-
-
-//     console.log("the scan detail", scanDetail)
-
-//     return {
-//       status: 200,
-//       message: 'success',
-//       scanDetail,
-//     };
-//   } catch (e: any) {
-//     return {
-//       status: 500,
-//       message: 'error',
-//       error: e?.message || e,
-//     };
-//   }
-// }
 
 
 
